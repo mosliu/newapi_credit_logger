@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>监控详情</title>
+    <style>
+        body { font-family: "Microsoft YaHei", sans-serif; margin: 24px; background: #f8fafc; color: #1f2937; }
+        .panel { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.08); margin-bottom: 16px; }
+        .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+        .meta div { background: #f1f5f9; padding: 10px; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; }
+        .filters { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+        input, button { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; }
+        button { border: 0; background: #1d4ed8; color: #fff; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="panel">
+    <h1>监控详情 - {{ source.name }}</h1>
+    <div class="meta">
+        <div><strong>Owner:</strong> {{ source.key_owner }}</div>
+        <div><strong>地址:</strong> {{ source.base_url }}</div>
+        <div><strong>周期:</strong> {{ source.interval_seconds }} 秒</div>
+        <div><strong>备注:</strong> {{ source.remark or "-" }}</div>
+    </div>
+</div>
+
+<div class="panel">
+    <form class="filters" method="get" action="/ui/sources/{{ source.id }}">
+        <input type="text" name="start_at" placeholder="起始时间 ISO8601" value="{{ start_at }}">
+        <input type="text" name="end_at" placeholder="结束时间 ISO8601" value="{{ end_at }}">
+        <button type="submit">筛选</button>
+    </form>
+    <canvas id="balanceChart" height="100"></canvas>
+</div>
+
+<div class="panel">
+    <h2>失败记录</h2>
+    <table>
+        <thead>
+        <tr><th>时间</th><th>状态码</th><th>耗时(ms)</th><th>错误</th></tr>
+        </thead>
+        <tbody>
+        {% for item in failed_records %}
+            <tr>
+                <td>{{ item.checked_at }}</td>
+                <td>{{ item.http_status or "-" }}</td>
+                <td>{{ item.latency_ms or "-" }}</td>
+                <td>{{ item.error_message or "-" }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4">无失败记录</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+const points = {{ chart_points | tojson }};
+const canvas = document.getElementById("balanceChart");
+const ctx = canvas.getContext("2d");
+if (points.length > 1) {
+  const padding = 30;
+  const w = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1);
+  const h = canvas.height = 220 * (window.devicePixelRatio || 1);
+  const values = points.map(p => p.balance);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = (max - min) || 1;
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = "#0f766e";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach((p, i) => {
+    const x = padding + i * ((w - padding * 2) / (points.length - 1));
+    const y = h - padding - ((p.balance - min) / span) * (h - padding * 2);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+}
+</script>
+</body>
+</html>
