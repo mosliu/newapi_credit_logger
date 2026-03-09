@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "NewAPI Credit Logger"
+    app_version: str = "0.1.1"
     app_env: str = "dev"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
@@ -23,6 +24,32 @@ class Settings(BaseSettings):
     api_key_encrypt_secret: str = "change-me-in-production"
     admin_password: str = "change-me-admin-password"
     admin_session_secret: str = "change-me-admin-session-secret"
+
+    api_tool_rate_limit_per_minute: int = 30
+
+    default_test_channel: str = "openai_responses"
+    default_cli_profile: str = "codex"
+    default_openai_base_url: str = "https://api.openai.com"
+    default_openai_chat_model: str = "gpt-5.3-codex"
+    default_openai_responses_model: str = "gpt-5.3-codex"
+    default_gemini_base_url: str = "https://generativelanguage.googleapis.com"
+    default_gemini_model: str = "gemini-3-flash-preview"
+    default_claude_base_url: str = "https://api.anthropic.com"
+    default_claude_model: str = "claude-sonnet-4-6"
+
+    parser_llm_channel: str = "openai_chat"
+    parser_llm_base_url: str = ""
+    parser_llm_api_key: str = ""
+    parser_llm_model: str = ""
+    parser_llm_timeout_sec: float = 30.0
+    parser_llm_cli_profile: str = "default"
+
+    neko_base_url: str = ""
+    neko_base_urls: str = "{}"
+    neko_default_site_key: str = ""
+    neko_show_balance: bool = True
+    neko_show_detail: bool = True
+    neko_timeout_sec: float = 30.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

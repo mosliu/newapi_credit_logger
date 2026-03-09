@@ -322,6 +322,7 @@
         </div>
         <div class="topbar-right">
             <span class="chip">后台管理</span>
+            <span class="chip">v{{ app_version }}</span>
             {% if is_admin_authenticated %}
                 <form method="post" action="/admin/logout" class="inline">
                     <button class="btn btn-muted" type="submit">退出登录</button>

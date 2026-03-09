@@ -1,0 +1,1108 @@
+{% extends "base.html" %}
+{% block title %}普通用户首页{% endblock %}
+{% block head %}
+<style>
+    .segmented {
+        display: inline-flex;
+        gap: 3px;
+        padding: 3px;
+        border-radius: 12px;
+        border: 0.5px solid var(--line);
+        background: rgba(255, 255, 255, 0.5);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    }
+    @media (prefers-color-scheme: dark) {
+        .segmented {
+            background: rgba(255, 255, 255, 0.08);
+        }
+    }
+    .segment-btn {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        padding: 8px 12px;
+        border-radius: 9px;
+        cursor: pointer;
+        transition: all .2s cubic-bezier(.22,.68,.2,1);
+    }
+    .segment-btn.active {
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.86);
+        box-shadow: 0 4px 14px -9px rgba(6, 25, 62, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+    }
+    @media (prefers-color-scheme: dark) {
+        .segment-btn.active {
+            background: rgba(61, 73, 95, 0.86);
+            color: #f0f4fb;
+        }
+    }
+    .home-tab-panel {
+        display: none;
+    }
+    .home-tab-panel.active {
+        display: block;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+    .field {
+        display: grid;
+        gap: 6px;
+    }
+    .field.full {
+        grid-column: 1 / -1;
+    }
+    label {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+    }
+    textarea, select {
+        width: 100%;
+        border: 0.5px solid var(--line);
+        border-radius: 10px;
+        padding: 9px 10px;
+        font: inherit;
+        color: inherit;
+        background: rgba(255, 255, 255, 0.76);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    @media (prefers-color-scheme: dark) {
+        textarea, select {
+            background: rgba(255, 255, 255, 0.08);
+        }
+    }
+    textarea:focus, select:focus {
+        outline: none;
+        border-color: rgba(0, 122, 255, 0.42);
+        box-shadow: 0 0 0 4px var(--ring), inset 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+    textarea {
+        min-height: 130px;
+        resize: vertical;
+        line-height: 1.45;
+    }
+    .tool-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .btn-secondary {
+        border: 0.5px solid var(--line);
+        color: var(--text);
+        background: rgba(255, 255, 255, 0.66);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    @media (prefers-color-scheme: dark) {
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.09);
+        }
+    }
+    .checks {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .check-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+    }
+    .check-item input {
+        width: auto;
+        box-shadow: none;
+    }
+    .kv-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .kv-item {
+        border: 0.5px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: rgba(255, 255, 255, 0.5);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        display: grid;
+        gap: 6px;
+    }
+    .kv-item span {
+        color: var(--muted);
+        font-size: 12px;
+    }
+    .kv-item strong {
+        font-size: 15px;
+    }
+    .row-between {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .result-meta {
+        margin: 0 0 8px;
+        font-size: 13px;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    .result-meta.ok {
+        color: #12895f;
+    }
+    .result-meta.err {
+        color: #c43850;
+    }
+    pre {
+        margin: 0;
+        border: 0.5px solid var(--line);
+        border-radius: 10px;
+        background: #0f172a;
+        color: #e2e8f0;
+        padding: 12px;
+        overflow: auto;
+        max-height: 360px;
+        line-height: 1.4;
+        font-size: 12px;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+    }
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 760px;
+        font-size: 13px;
+    }
+    .data-table th,
+    .data-table td {
+        border-bottom: 0.5px solid var(--line);
+        padding: 8px 10px;
+        text-align: left;
+        vertical-align: top;
+        word-break: break-word;
+    }
+    .data-table th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: rgba(255, 255, 255, 0.9);
+    }
+    @media (prefers-color-scheme: dark) {
+        .data-table th {
+            background: rgba(22, 30, 44, 0.92);
+        }
+    }
+    .data-table tbody tr:nth-child(even) {
+        background: rgba(12, 33, 79, 0.04);
+    }
+    .empty-row {
+        text-align: center;
+        color: var(--muted);
+    }
+    .footnote {
+        font-size: 12px;
+        color: var(--muted);
+        text-align: center;
+    }
+    .footnote a {
+        color: inherit;
+    }
+    @media (max-width: 900px) {
+        .grid {
+            grid-template-columns: 1fr;
+        }
+        .kv-grid {
+            grid-template-columns: 1fr;
+        }
+        .segmented {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .segment-btn {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+{% block content %}
+<section class="panel reveal">
+    <h2>普通用户查询首页</h2>
+    <div class="muted">默认入口为 Key 片段查询；API 测试与 Neko 查询已提升为一级标签。</div>
+    <div class="segmented" role="tablist" aria-label="首页功能标签" style="margin-top:12px;">
+        <button
+            type="button"
+            role="tab"
+            class="segment-btn home-tab-btn {% if active_tab == 'key-search' %}active{% endif %}"
+            data-home-target="homeKeySearch"
+            aria-selected="{{ 'true' if active_tab == 'key-search' else 'false' }}"
+        >
+            Key 片段查询
+        </button>
+        <button
+            type="button"
+            role="tab"
+            class="segment-btn home-tab-btn {% if active_tab == 'api-test' %}active{% endif %}"
+            data-home-target="homeApiTest"
+            aria-selected="{{ 'true' if active_tab == 'api-test' else 'false' }}"
+        >
+            API 测试
+        </button>
+        <button
+            type="button"
+            role="tab"
+            class="segment-btn home-tab-btn {% if active_tab == 'neko-query' %}active{% endif %}"
+            data-home-target="homeNekoQuery"
+            aria-selected="{{ 'true' if active_tab == 'neko-query' else 'false' }}"
+        >
+            Neko 查询
+        </button>
+    </div>
+</section>
+
+<section id="homeKeySearch" class="home-tab-panel {% if active_tab == 'key-search' %}active{% endif %}">
+    <section class="panel reveal">
+        {% if error %}
+            <div class="bad" style="margin-bottom:10px;">{{ error }}</div>
+        {% endif %}
+        <form class="toolbar" method="get" action="/ui">
+            <input type="hidden" name="tab" id="homeTabField" value="key-search">
+            <input type="text" id="keyFragmentInput" name="key_fragment" value="{{ key_fragment }}" placeholder="输入 key 片段">
+            <button type="submit">查询</button>
+        </form>
+        <div class="muted" style="margin-top:8px;">
+            无需登录。建议输入 Key 后缀至少 6 位，或前缀至少 8 位，系统会尽量匹配。
+        </div>
+    </section>
+
+    <section class="panel reveal">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>匹配方式</th>
+                    <th>Key(脱敏)</th>
+                    <th>Owner</th>
+                    <th>Key额度</th>
+                    <th>Key余额</th>
+                    <th>最新使用量</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for item in rows %}
+                    <tr>
+                        <td>{{ item.name }}</td>
+                        <td>{{ item.match_hint }}</td>
+                        <td>{{ item.api_key_masked }}</td>
+                        <td>{{ item.key_owner }}</td>
+                        <td>{{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}</td>
+                        <td>{{ item.latest_balance if item.latest_balance is not none else "-" }}</td>
+                        <td>{{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7">暂无匹配结果</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</section>
+
+<section id="homeApiTest" class="home-tab-panel {% if active_tab == 'api-test' %}active{% endif %}">
+    <section class="panel reveal">
+        <h2>API 可用性测试工具</h2>
+        <div class="muted">完整复制自 `html_api_test`：规则解析、LLM 解析与联通测试。</div>
+    </section>
+
+    <section>
+        <section class="panel reveal">
+            <div class="grid">
+                <div class="field full">
+                    <label for="rawInput">原始文本（可粘贴配置、文档片段、curl、env 内容）</label>
+                    <textarea id="rawInput" placeholder="例如：base_url=https://api.openai.com&#10;api_key=sk-...&#10;model=gpt-5.3-codex"></textarea>
+                </div>
+            </div>
+            <div class="tool-actions" style="margin-top: 8px;">
+                <button id="ruleParseBtn" type="button" class="btn-secondary">规则解析</button>
+                <button id="llmParseBtn" type="button" class="btn-secondary">LLM 解析</button>
+            </div>
+            <p id="parseInfo" class="muted" style="margin-top:8px;"></p>
+        </section>
+
+        <section class="panel reveal">
+            <div class="grid">
+                <div class="field">
+                    <label for="channel">渠道类型</label>
+                    <select id="channel">
+                        <option value="openai_chat">OpenAI Chat Completions</option>
+                        <option value="openai_responses">OpenAI Responses</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="claude">Claude</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="cliProfile">CLI Header 类型</label>
+                    <select id="cliProfile">
+                        <option value="default">default</option>
+                        <option value="cc">cc</option>
+                        <option value="codex">codex</option>
+                        <option value="geminicli">geminicli</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="model">模型</label>
+                    <input id="model" type="text">
+                </div>
+                <div class="field full">
+                    <label for="baseUrl">API 站地址（Base URL）</label>
+                    <input id="baseUrl" type="text" placeholder="https://api.openai.com">
+                </div>
+                <div class="field full">
+                    <label for="apiKey">API Key</label>
+                    <input id="apiKey" type="text" placeholder="sk-...">
+                </div>
+            </div>
+            <div class="tool-actions" style="margin-top: 12px;">
+                <button id="testBtn" type="button">测试</button>
+                <button id="fillDefaultBtn" type="button" class="btn-secondary">恢复渠道默认值</button>
+            </div>
+        </section>
+
+        <section class="panel reveal">
+            <h2 style="font-size:18px;">测试结果</h2>
+            <p id="resultMeta" class="result-meta">尚未测试。</p>
+            <pre id="resultBody">等待请求...</pre>
+        </section>
+    </section>
+</section>
+
+<section id="homeNekoQuery" class="home-tab-panel {% if active_tab == 'neko-query' %}active{% endif %}">
+    <section class="panel reveal">
+        <h2>Neko API Key 查询</h2>
+        <div class="muted">完整复制自 `html_api_test`：令牌信息、调用日志、复制与 CSV 导出。</div>
+    </section>
+
+    <section>
+        <section class="panel reveal">
+            <p id="nekoConfigInfo" class="muted">等待加载配置...</p>
+            <div class="grid" style="margin-top:10px;">
+                <div class="field">
+                    <label for="nekoBaseUrl">NewAPI 地址（Base URL）</label>
+                    <input id="nekoBaseUrl" type="text" placeholder="https://newapi.example.com">
+                </div>
+                <div class="field">
+                    <label for="nekoTimeout">超时（秒）</label>
+                    <input id="nekoTimeout" type="number" min="3" max="120" step="1" value="30">
+                </div>
+                <div class="field full">
+                    <label for="nekoToken">Token</label>
+                    <input id="nekoToken" type="password" placeholder="sk-xxxxxxxxxxxx">
+                </div>
+                <div class="field full">
+                    <div class="checks">
+                        <label class="check-item"><input id="nekoFetchBalance" type="checkbox" checked> 查询令牌信息</label>
+                        <label class="check-item"><input id="nekoFetchDetail" type="checkbox" checked> 查询调用日志</label>
+                    </div>
+                </div>
+            </div>
+            <div class="tool-actions" style="margin-top:12px;">
+                <button id="nekoQueryBtn" type="button">查询</button>
+                <button id="nekoResetBtn" type="button" class="btn-secondary">清空结果</button>
+            </div>
+            <p id="nekoInfo" class="muted" style="margin-top:8px;">输入 NewAPI 地址与 Token 后查询。</p>
+        </section>
+
+        <section class="panel reveal">
+            <div class="row-between">
+                <h2 style="font-size:18px;margin:0;">令牌信息</h2>
+                <button id="nekoCopyInfoBtn" type="button" class="btn-secondary">复制令牌信息</button>
+            </div>
+            <div id="nekoTokenInfo" class="kv-grid" style="margin-top:10px;">
+                <div class="kv-item"><span>令牌名称</span><strong id="nekoTokenName">未知</strong></div>
+                <div class="kv-item"><span>令牌总额</span><strong id="nekoTotalGranted">未知</strong></div>
+                <div class="kv-item"><span>剩余额度</span><strong id="nekoTotalAvailable">未知</strong></div>
+                <div class="kv-item"><span>已用额度</span><strong id="nekoTotalUsed">未知</strong></div>
+                <div class="kv-item"><span>有效期至</span><strong id="nekoExpiresAt">未知</strong></div>
+                <div class="kv-item"><span>日志条数</span><strong id="nekoLogCount">0</strong></div>
+            </div>
+        </section>
+
+        <section class="panel reveal">
+            <div class="row-between">
+                <h2 style="font-size:18px;margin:0;">调用日志</h2>
+                <button id="nekoExportBtn" type="button" class="btn-secondary">导出 CSV</button>
+            </div>
+            <p id="nekoResultMeta" class="result-meta" style="margin-top:10px;">尚未查询。</p>
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>令牌名称</th>
+                        <th>模型</th>
+                        <th>提示</th>
+                        <th>补全</th>
+                        <th>花费</th>
+                        <th>详情</th>
+                    </tr>
+                    </thead>
+                    <tbody id="nekoLogsBody">
+                    <tr><td colspan="7" class="empty-row">等待查询...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="panel reveal">
+            <h2 style="font-size:18px;">查询返回</h2>
+            <pre id="nekoResultBody">等待请求...</pre>
+        </section>
+    </section>
+
+    <section class="panel reveal">
+        <p class="footnote">
+            感谢参考：
+            <a href="https://github.com/Calcium-Ion/neko-api-key-tool" target="_blank" rel="noopener noreferrer">Calcium-Ion/neko-api-key-tool</a>
+        </p>
+    </section>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+"use strict";
+
+const defaults = {
+  openai_chat:      { baseUrl: "https://api.openai.com",                    model: "gpt-5.3-codex" },
+  openai_responses: { baseUrl: "https://api.openai.com",                    model: "gpt-5.3-codex" },
+  gemini:           { baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-3-flash-preview" },
+  claude:           { baseUrl: "https://api.anthropic.com",                 model: "claude-sonnet-4-6" }
+};
+
+let defaultChannel = "openai_responses";
+let defaultCliProfile = "default";
+
+const runtime = {
+  apiBase: "",
+  neko: {
+    enabled: true,
+    showBalance: true,
+    showDetail: true,
+    defaultBaseUrl: "",
+    timeoutSec: 30
+  }
+};
+
+const state = {
+  nekoLastResult: null,
+  nekoLogs: []
+};
+
+const el = {
+  homeTabBtns:      Array.from(document.querySelectorAll(".home-tab-btn")),
+  homeTabPanels:    Array.from(document.querySelectorAll(".home-tab-panel")),
+
+  homeTabField:     document.getElementById("homeTabField"),
+  keyFragmentInput: document.getElementById("keyFragmentInput"),
+
+  rawInput:         document.getElementById("rawInput"),
+  channel:          document.getElementById("channel"),
+  cliProfile:       document.getElementById("cliProfile"),
+  baseUrl:          document.getElementById("baseUrl"),
+  apiKey:           document.getElementById("apiKey"),
+  model:            document.getElementById("model"),
+  parseInfo:        document.getElementById("parseInfo"),
+  resultMeta:       document.getElementById("resultMeta"),
+  resultBody:       document.getElementById("resultBody"),
+  testBtn:          document.getElementById("testBtn"),
+  fillDefaultBtn:   document.getElementById("fillDefaultBtn"),
+  ruleParseBtn:     document.getElementById("ruleParseBtn"),
+  llmParseBtn:      document.getElementById("llmParseBtn"),
+
+  nekoConfigInfo:   document.getElementById("nekoConfigInfo"),
+  nekoBaseUrl:      document.getElementById("nekoBaseUrl"),
+  nekoTimeout:      document.getElementById("nekoTimeout"),
+  nekoToken:        document.getElementById("nekoToken"),
+  nekoFetchBalance: document.getElementById("nekoFetchBalance"),
+  nekoFetchDetail:  document.getElementById("nekoFetchDetail"),
+  nekoQueryBtn:     document.getElementById("nekoQueryBtn"),
+  nekoResetBtn:     document.getElementById("nekoResetBtn"),
+  nekoInfo:         document.getElementById("nekoInfo"),
+  nekoResultMeta:   document.getElementById("nekoResultMeta"),
+  nekoResultBody:   document.getElementById("nekoResultBody"),
+  nekoLogsBody:     document.getElementById("nekoLogsBody"),
+  nekoCopyInfoBtn:  document.getElementById("nekoCopyInfoBtn"),
+  nekoExportBtn:    document.getElementById("nekoExportBtn"),
+
+  nekoTokenName:    document.getElementById("nekoTokenName"),
+  nekoTotalGranted: document.getElementById("nekoTotalGranted"),
+  nekoTotalAvailable: document.getElementById("nekoTotalAvailable"),
+  nekoTotalUsed:    document.getElementById("nekoTotalUsed"),
+  nekoExpiresAt:    document.getElementById("nekoExpiresAt"),
+  nekoLogCount:     document.getElementById("nekoLogCount")
+};
+
+function buildApiUrl(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  if (!runtime.apiBase) return path;
+  return `${runtime.apiBase}${path}`;
+}
+
+function maskKey(key) {
+  if (!key) return "";
+  if (key.length <= 10) return `${key.slice(0, 2)}***`;
+  return `${key.slice(0, 6)}...${key.slice(-4)}`;
+}
+
+function asBool(value, fallback) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function applyDefaults(force = true) {
+  const channel = el.channel.value;
+  const cfg = defaults[channel];
+  if (!cfg) return;
+  if (force) {
+    el.baseUrl.value = cfg.baseUrl;
+    el.model.value = cfg.model;
+    return;
+  }
+  if (!el.baseUrl.value.trim()) el.baseUrl.value = cfg.baseUrl;
+  if (!el.model.value.trim()) el.model.value = cfg.model;
+}
+
+function renderResultMeta(meta, ok) {
+  el.resultMeta.className = `result-meta ${ok ? "ok" : "err"}`;
+  el.resultMeta.textContent = meta;
+}
+
+function renderResultBody(obj) {
+  el.resultBody.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+}
+
+function renderNekoMeta(meta, ok) {
+  el.nekoResultMeta.className = `result-meta ${ok ? "ok" : "err"}`;
+  el.nekoResultMeta.textContent = meta;
+}
+
+function renderNekoBody(obj) {
+  el.nekoResultBody.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+}
+
+function switchHomeTab(targetId) {
+  el.homeTabBtns.forEach((btn) => {
+    const active = btn.dataset.homeTarget === targetId;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  el.homeTabPanels.forEach((panel) => {
+    panel.classList.toggle("active", panel.id === targetId);
+  });
+  if (el.homeTabField) {
+    if (targetId === "homeApiTest") {
+      el.homeTabField.value = "api-test";
+    } else if (targetId === "homeNekoQuery") {
+      el.homeTabField.value = "neko-query";
+    } else {
+      el.homeTabField.value = "key-search";
+    }
+  }
+}
+
+function withLoading(btn, label, asyncFn) {
+  return async () => {
+    btn.disabled = true;
+    btn.textContent = `${label}中...`;
+    try {
+      await asyncFn();
+    } finally {
+      btn.disabled = false;
+      btn.textContent = label;
+    }
+  };
+}
+
+async function copyText(text) {
+  if (!text) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  textArea.style.top = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  document.execCommand("copy");
+  textArea.remove();
+}
+
+function formatTime(ts) {
+  const n = Number(ts || 0);
+  if (!Number.isFinite(n) || n <= 0) return "-";
+  const ms = n > 1e12 ? n : n * 1000;
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleString();
+}
+
+function formatQuota(value) {
+  const n = Number(value || 0);
+  if (!Number.isFinite(n)) return "0";
+  return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+
+function escapeCsvCell(value) {
+  const text = value == null ? "" : String(value);
+  if (/[",\r\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+  return text;
+}
+
+function downloadCsv(filename, headers, rows) {
+  const lines = [headers.map(escapeCsvCell).join(",")];
+  rows.forEach((row) => {
+    lines.push(row.map(escapeCsvCell).join(","));
+  });
+  const csv = `\ufeff${lines.join("\r\n")}`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 200);
+}
+
+async function getJson(path) {
+  const resp = await fetch(buildApiUrl(path));
+  const text = await resp.text();
+  let data = text;
+  try { data = JSON.parse(text); } catch { }
+  if (!resp.ok) {
+    const detail = data && typeof data === "object" ? (data.detail || JSON.stringify(data)) : text;
+    throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${detail}`);
+  }
+  return data;
+}
+
+async function postJson(path, payload) {
+  const resp = await fetch(buildApiUrl(path), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const text = await resp.text();
+  let data = text;
+  try { data = JSON.parse(text); } catch { }
+  if (!resp.ok) {
+    const detail = data && typeof data === "object" ? (data.detail || JSON.stringify(data)) : text;
+    throw new Error(`HTTP ${resp.status} ${resp.statusText}: ${detail}`);
+  }
+  return data;
+}
+
+function applyNekoConfig(nekoCfg) {
+  if (!nekoCfg || typeof nekoCfg !== "object") return;
+
+  runtime.neko.enabled = asBool(nekoCfg.enabled, true);
+  runtime.neko.showBalance = asBool(nekoCfg.showBalance, true);
+  runtime.neko.showDetail = asBool(nekoCfg.showDetail, true);
+
+  const mapped = (nekoCfg.baseUrls && typeof nekoCfg.baseUrls === "object") ? nekoCfg.baseUrls : {};
+  let defaultBase = String(nekoCfg.defaultBaseUrl || "").trim();
+  if (!defaultBase) {
+    const defaultSiteKey = String(nekoCfg.defaultSiteKey || "").trim();
+    if (defaultSiteKey && typeof mapped[defaultSiteKey] === "string") {
+      defaultBase = mapped[defaultSiteKey].trim();
+    }
+  }
+  if (!defaultBase) {
+    const first = Object.values(mapped).find((v) => typeof v === "string" && v.trim());
+    if (typeof first === "string") defaultBase = first.trim();
+  }
+  runtime.neko.defaultBaseUrl = defaultBase;
+
+  const timeoutValue = Number(nekoCfg.timeoutSec);
+  runtime.neko.timeoutSec = Number.isFinite(timeoutValue) && timeoutValue >= 3 ? timeoutValue : 30;
+
+  if (!el.nekoBaseUrl.value.trim() && runtime.neko.defaultBaseUrl) {
+    el.nekoBaseUrl.value = runtime.neko.defaultBaseUrl;
+  }
+  el.nekoTimeout.value = String(runtime.neko.timeoutSec);
+  el.nekoFetchBalance.checked = runtime.neko.showBalance;
+  el.nekoFetchDetail.checked = runtime.neko.showDetail;
+  el.nekoFetchBalance.disabled = !runtime.neko.showBalance;
+  el.nekoFetchDetail.disabled = !runtime.neko.showDetail;
+
+  const enabledFeatures = [
+    runtime.neko.showBalance ? "令牌信息" : null,
+    runtime.neko.showDetail ? "调用日志" : null
+  ].filter(Boolean).join(" / ");
+
+  if (!enabledFeatures) {
+    el.nekoQueryBtn.disabled = true;
+    el.nekoConfigInfo.textContent = "Neko 查询项都被禁用（NEKO_SHOW_BALANCE/NEKO_SHOW_DETAIL）。";
+    return;
+  }
+
+  el.nekoQueryBtn.disabled = false;
+  if (runtime.neko.defaultBaseUrl) {
+    el.nekoConfigInfo.textContent = `已加载默认地址（可改）：${runtime.neko.defaultBaseUrl}；可用功能：${enabledFeatures}`;
+  } else {
+    el.nekoConfigInfo.textContent = `请手动填写 NewAPI 地址；可用功能：${enabledFeatures}`;
+  }
+}
+
+async function loadUiConfig() {
+  try {
+    const data = await getJson("/api/config");
+    if (!data || typeof data !== "object") return;
+
+    if (data.defaultChannel && defaults[data.defaultChannel]) {
+      defaultChannel = data.defaultChannel;
+    }
+    if (typeof data.defaultCliProfile === "string" && data.defaultCliProfile.trim()) {
+      defaultCliProfile = data.defaultCliProfile.trim();
+    }
+
+    const remoteDefaults = data.defaults;
+    if (remoteDefaults && typeof remoteDefaults === "object") {
+      Object.keys(defaults).forEach((channel) => {
+        const remote = remoteDefaults[channel];
+        if (!remote || typeof remote !== "object") return;
+        if (typeof remote.baseUrl === "string" && remote.baseUrl.trim()) {
+          defaults[channel].baseUrl = remote.baseUrl.trim();
+        }
+        if (typeof remote.model === "string" && remote.model.trim()) {
+          defaults[channel].model = remote.model.trim();
+        }
+      });
+    }
+
+    applyNekoConfig(data.nekoTool);
+  } catch (err) {
+    console.warn("加载后端配置失败，继续使用前端默认配置。", err);
+    el.nekoConfigInfo.textContent = "加载后端配置失败，请手动填写 NewAPI 地址后查询。";
+    el.nekoQueryBtn.disabled = false;
+  }
+}
+
+function fillForm(data, sourceLabel, note) {
+  if (data.channel && defaults[data.channel]) {
+    el.channel.value = data.channel;
+  }
+  applyDefaults(false);
+  if (data.baseUrl) el.baseUrl.value = data.baseUrl;
+  if (data.apiKey) el.apiKey.value = data.apiKey;
+  if (data.model) el.model.value = data.model;
+
+  const parts = [
+    `来源：${sourceLabel}`,
+    `channel=${el.channel.value}`,
+    `baseUrl=${el.baseUrl.value || "(空)"}`,
+    `apiKey=${el.apiKey.value || "(空)"}`,
+    `model=${el.model.value || "(空)"}`
+  ];
+  if (note) parts.push(`note=${note}`);
+  el.parseInfo.textContent = parts.join(" | ");
+}
+
+el.channel.addEventListener("change", () => applyDefaults(false));
+
+el.fillDefaultBtn.addEventListener("click", () => {
+  applyDefaults(true);
+  el.parseInfo.textContent = "已按当前渠道恢复默认 Base URL 与默认模型。";
+});
+
+el.ruleParseBtn.addEventListener(
+  "click",
+  withLoading(el.ruleParseBtn, "规则解析", async () => {
+    try {
+      el.parseInfo.textContent = "规则解析中...";
+      const parsed = await postJson("/api/parse/rule", { raw_text: el.rawInput.value });
+      fillForm(parsed.data || {}, parsed.source || "rule", parsed.note || "");
+    } catch (err) {
+      el.parseInfo.textContent = `规则解析失败：${err.message}`;
+      renderResultMeta(`规则解析失败：${err.message}`, false);
+    }
+  })
+);
+
+el.llmParseBtn.addEventListener(
+  "click",
+  withLoading(el.llmParseBtn, "LLM 解析", async () => {
+    try {
+      el.parseInfo.textContent = "LLM 解析中...";
+      const parsed = await postJson("/api/parse/llm", { raw_text: el.rawInput.value });
+      fillForm(parsed.data || {}, parsed.source || "llm", parsed.note || "");
+    } catch (err) {
+      el.parseInfo.textContent = `LLM 解析失败：${err.message}`;
+      renderResultMeta(`LLM 解析失败：${err.message}`, false);
+    }
+  })
+);
+
+el.testBtn.addEventListener(
+  "click",
+  withLoading(el.testBtn, "测试", async () => {
+    const channel = el.channel.value;
+    const baseUrl = el.baseUrl.value.trim();
+    const apiKey = el.apiKey.value.trim();
+    const model = el.model.value.trim();
+    const cliProfile = (el.cliProfile.value || "default").trim();
+
+    if (!baseUrl || !apiKey || !model) {
+      renderResultMeta("缺少必填参数：请填写 Base URL、API Key、模型。", false);
+      renderResultBody("参数校验失败。");
+      return;
+    }
+
+    renderResultMeta(`请求中... channel=${channel} | model=${model} | cli=${cliProfile}`, true);
+    renderResultBody("正在发送请求，请稍候...");
+
+    try {
+      const result = await postJson("/api/test", {
+        channel,
+        base_url: baseUrl,
+        api_key: apiKey,
+        model,
+        cli_profile: cliProfile
+      });
+
+      renderResultMeta(
+        `完成：HTTP ${result.status} ${result.statusText} | ${result.elapsedMs}ms | ` +
+        `channel=${result.channel} | model=${result.model} | cli=${result.cliProfile || cliProfile}`,
+        !!result.ok
+      );
+      renderResultBody(result);
+    } catch (err) {
+      renderResultMeta(`请求失败：${err.message}`, false);
+      renderResultBody({
+        channel,
+        model,
+        cliProfile,
+        error: err.message,
+        note: "可能原因：后端未启动、上游地址错误、Key 无效、网络不可达。"
+      });
+    }
+  })
+);
+
+function resetNekoInfoPanel() {
+  el.nekoTokenName.textContent = "未知";
+  el.nekoTotalGranted.textContent = "未知";
+  el.nekoTotalAvailable.textContent = "未知";
+  el.nekoTotalUsed.textContent = "未知";
+  el.nekoExpiresAt.textContent = "未知";
+  el.nekoLogCount.textContent = "0";
+}
+
+function renderNekoLogs(logs) {
+  el.nekoLogsBody.innerHTML = "";
+  if (!Array.isArray(logs) || logs.length === 0) {
+    const row = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "empty-row";
+    td.textContent = "暂无日志";
+    row.appendChild(td);
+    el.nekoLogsBody.appendChild(row);
+    return;
+  }
+
+  logs.forEach((item) => {
+    const row = document.createElement("tr");
+    const cells = [
+      formatTime(item.created_at),
+      item.token_name || "-",
+      item.model_name || "-",
+      String(item.prompt_tokens ?? "-"),
+      String(item.completion_tokens ?? "-"),
+      formatQuota(item.quota),
+      item.content || ""
+    ];
+    cells.forEach((text) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      row.appendChild(td);
+    });
+    el.nekoLogsBody.appendChild(row);
+  });
+}
+
+function renderNekoTokenInfo(result) {
+  const tokenInfo = (result && typeof result === "object") ? result.tokenInfo : null;
+  const stats = (result && typeof result === "object") ? (result.stats || {}) : {};
+
+  if (!tokenInfo) {
+    resetNekoInfoPanel();
+    el.nekoLogCount.textContent = String(stats.logCount || 0);
+    return;
+  }
+
+  const unlimited = !!tokenInfo.unlimitedQuota;
+  el.nekoTokenName.textContent = tokenInfo.tokenName || "未知";
+  el.nekoTotalGranted.textContent = unlimited ? "无限" : formatQuota(tokenInfo.totalGranted);
+  el.nekoTotalAvailable.textContent = unlimited ? "无限制" : formatQuota(tokenInfo.totalAvailable);
+  el.nekoTotalUsed.textContent = unlimited ? "不计算" : formatQuota(tokenInfo.totalUsed);
+  el.nekoExpiresAt.textContent = tokenInfo.expiresAtText || formatTime(tokenInfo.expiresAt);
+  el.nekoLogCount.textContent = String(stats.logCount || 0);
+}
+
+function buildTokenInfoText(result) {
+  const tokenInfo = result && result.tokenInfo;
+  const stats = result && result.stats ? result.stats : {};
+  if (!tokenInfo) return "暂无令牌信息";
+
+  const unlimited = !!tokenInfo.unlimitedQuota;
+  return [
+    `地址: ${result.baseUrl || "-"}`,
+    `令牌名称: ${tokenInfo.tokenName || "未知"}`,
+    `令牌总额: ${unlimited ? "无限" : formatQuota(tokenInfo.totalGranted)}`,
+    `剩余额度: ${unlimited ? "无限制" : formatQuota(tokenInfo.totalAvailable)}`,
+    `已用额度: ${unlimited ? "不计算" : formatQuota(tokenInfo.totalUsed)}`,
+    `有效期至: ${tokenInfo.expiresAtText || formatTime(tokenInfo.expiresAt)}`,
+    `日志条数: ${stats.logCount || 0}`,
+    `累计花费: ${formatQuota(stats.totalQuota || 0)}`
+  ].join("\n");
+}
+
+el.nekoQueryBtn.addEventListener(
+  "click",
+  withLoading(el.nekoQueryBtn, "查询", async () => {
+    const token = el.nekoToken.value.trim();
+    const baseUrl = el.nekoBaseUrl.value.trim();
+    const timeoutSec = Number(el.nekoTimeout.value || runtime.neko.timeoutSec || 30);
+    const fetchBalance = !!el.nekoFetchBalance.checked;
+    const fetchDetail = !!el.nekoFetchDetail.checked;
+
+    if (!baseUrl) {
+      renderNekoMeta("请先填写 NewAPI Base URL。", false);
+      return;
+    }
+    if (!token) {
+      renderNekoMeta("请先输入 token。", false);
+      return;
+    }
+    if (!fetchBalance && !fetchDetail) {
+      renderNekoMeta("请至少选择一个查询项。", false);
+      return;
+    }
+
+    renderNekoMeta(`查询中... baseUrl=${baseUrl}`, true);
+    renderNekoBody("正在发送请求，请稍候...");
+
+    try {
+      const result = await postJson("/api/neko/query", {
+        token,
+        base_url: baseUrl,
+        fetch_balance: fetchBalance,
+        fetch_detail: fetchDetail,
+        timeout_sec: Number.isFinite(timeoutSec) ? timeoutSec : runtime.neko.timeoutSec
+      });
+
+      state.nekoLastResult = result;
+      state.nekoLogs = Array.isArray(result.logs) ? result.logs : [];
+
+      renderNekoTokenInfo(result);
+      renderNekoLogs(state.nekoLogs);
+      renderNekoBody(result);
+
+      const errors = Array.isArray(result.errors) ? result.errors : [];
+      const statusLine = [
+        `baseUrl=${result.baseUrl || baseUrl}`,
+        `token=${result.tokenMasked || maskKey(token)}`,
+        `logs=${(result.stats && result.stats.logCount) || state.nekoLogs.length}`
+      ];
+      if (errors.length > 0) statusLine.push(`部分失败=${errors.length}`);
+      renderNekoMeta(`完成：${statusLine.join(" | ")}`, errors.length === 0);
+      el.nekoInfo.textContent = errors.length > 0 ? errors.join("；") : "查询完成。";
+    } catch (err) {
+      state.nekoLastResult = null;
+      state.nekoLogs = [];
+      resetNekoInfoPanel();
+      renderNekoLogs([]);
+      renderNekoMeta(`查询失败：${err.message}`, false);
+      renderNekoBody({ error: err.message, baseUrl, tokenMasked: maskKey(token) });
+      el.nekoInfo.textContent = "查询失败，请检查 base_url、token 与网络连通性。";
+    }
+  })
+);
+
+el.nekoResetBtn.addEventListener("click", () => {
+  state.nekoLastResult = null;
+  state.nekoLogs = [];
+  el.nekoResultBody.textContent = "等待请求...";
+  el.nekoResultMeta.textContent = "尚未查询。";
+  el.nekoInfo.textContent = "已清空结果。";
+  resetNekoInfoPanel();
+  renderNekoLogs([]);
+});
+
+el.nekoCopyInfoBtn.addEventListener("click", async () => {
+  if (!state.nekoLastResult) {
+    renderNekoMeta("暂无可复制数据，请先查询。", false);
+    return;
+  }
+  try {
+    await copyText(buildTokenInfoText(state.nekoLastResult));
+    renderNekoMeta("已复制令牌信息。", true);
+  } catch (err) {
+    renderNekoMeta(`复制失败：${err.message}`, false);
+  }
+});
+
+el.nekoExportBtn.addEventListener("click", () => {
+  if (!Array.isArray(state.nekoLogs) || state.nekoLogs.length === 0) {
+    renderNekoMeta("暂无日志可导出。", false);
+    return;
+  }
+  const headers = ["时间", "令牌名称", "模型", "提示", "补全", "花费", "详情"];
+  const rows = state.nekoLogs.map((item) => [
+    formatTime(item.created_at),
+    item.token_name || "",
+    item.model_name || "",
+    item.prompt_tokens ?? "",
+    item.completion_tokens ?? "",
+    item.quota ?? "",
+    item.content || ""
+  ]);
+  downloadCsv("neko_logs.csv", headers, rows);
+  renderNekoMeta(`已导出 ${rows.length} 条日志。`, true);
+});
+
+el.homeTabBtns.forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const target = btn.dataset.homeTarget;
+    if (target) switchHomeTab(target);
+  });
+});
+
+async function initApp() {
+  await loadUiConfig();
+
+  if (defaults[defaultChannel]) {
+    el.channel.value = defaultChannel;
+  }
+  if (el.cliProfile) {
+    el.cliProfile.value = defaultCliProfile;
+  }
+  applyDefaults(true);
+
+  resetNekoInfoPanel();
+  renderNekoLogs([]);
+}
+
+initApp();
+</script>
+{% endblock %}

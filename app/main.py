@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -18,18 +19,20 @@ logger = get_logger("app")
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(app: FastAPI):
     logger.info("Application startup")
+    app.state.http_client = httpx.AsyncClient()
     source_scheduler_service.start()
     yield
     source_scheduler_service.shutdown()
+    await app.state.http_client.aclose()
     logger.info("Application shutdown")
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.app_name,
-        version="0.1.0",
+        version=settings.app_version,
         lifespan=lifespan,
     )
 
@@ -54,8 +57,8 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
 
     @app.get("/", tags=["system"])
-    async def root() -> dict[str, str]:
-        return {"message": "newapi credit logger is running"}
+    async def root() -> RedirectResponse:
+        return RedirectResponse(url="/ui", status_code=303)
 
     return app
 

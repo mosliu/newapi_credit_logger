@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.services.query_service import (
     build_chart_points,
@@ -16,6 +17,39 @@ from app.services.query_service import (
 
 router = APIRouter(prefix="/ui")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+templates.env.globals["app_version"] = get_settings().app_version
+
+
+@router.get("", response_class=HTMLResponse)
+async def home(
+    request: Request,
+    key_fragment: str | None = Query(default=None),
+    tab: str | None = Query(default="key-search"),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    rows: list[dict] = []
+    error: str | None = None
+    if key_fragment:
+        rows, error = search_sources_by_key_fragment(db, key_fragment=key_fragment)
+    tab_value = (tab or "").strip().lower()
+    if tab_value == "api-tools":
+        # Backward compatible with old tab param.
+        active_tab = "api-test"
+    elif tab_value in {"key-search", "api-test", "neko-query"}:
+        active_tab = tab_value
+    else:
+        active_tab = "key-search"
+
+    return templates.TemplateResponse(
+        request=request,
+        name="home.html",
+        context={
+            "active_tab": active_tab,
+            "key_fragment": key_fragment or "",
+            "rows": rows,
+            "error": error,
+        },
+    )
 
 
 @router.get("/sources", response_class=HTMLResponse)
@@ -73,8 +107,9 @@ async def key_search(
 
     return templates.TemplateResponse(
         request=request,
-        name="key_search.html",
+        name="home.html",
         context={
+            "active_tab": "key-search",
             "key_fragment": key_fragment or "",
             "rows": rows,
             "error": error,

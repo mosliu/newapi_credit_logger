@@ -17,7 +17,9 @@
 - 后台管理系统 `/admin`，支持登录保护
 - 后台支持“复制新增”监控源（复制除 `api_key` 外的配置）
 - 前台查询页面 `/ui/sources`
-- 普通用户查询页面 `/ui/key-search`（按 key 前缀/后缀片段匹配，结果仅展示脱敏 key）
+- 普通用户首页 `/ui`（多 Tab：`Key 片段查询`、`API 测试`、`Neko 查询`）
+- 兼容保留 `/ui/key-search`（按 key 前缀/后缀片段匹配，结果仅展示脱敏 key）
+- 内置 `html_api_test` 同等能力：规则解析、LLM 解析、上游联通测试、Neko Token 查询/导出
 - 调试日志、错误日志、上游请求日志分文件输出
 - 支持 SQLite / MySQL / PostgreSQL
 
@@ -81,6 +83,7 @@ copy .env.example .env
 重点配置项：
 
 ```env
+APP_VERSION=0.1.1
 DATABASE_URL=sqlite:///./data/newapi_credit_logger.db
 LOG_LEVEL=DEBUG
 API_KEY_ENCRYPT_SECRET=change-me-in-production
@@ -109,8 +112,9 @@ uv run python "main.py"
 默认地址：
 
 - API：`http://127.0.0.1:8000/api`
-- 前台：`http://127.0.0.1:8000/ui/sources`
-- 普通用户 Key 查询：`http://127.0.0.1:8000/ui/key-search`
+- 普通用户首页：`http://127.0.0.1:8000/ui`
+- 前台监控列表：`http://127.0.0.1:8000/ui/sources`
+- 兼容入口（Key 查询）：`http://127.0.0.1:8000/ui/key-search`
 - 后台：`http://127.0.0.1:8000/admin`
 
 ## 后台登录
@@ -233,6 +237,7 @@ python -m compileall "app"
 ## 文档
 
 - 开发计划：`docs/DEVELOPMENT_PLAN.md`
+- 发布日志：`docs/RELEASE_NOTES.md`
 - Provider 兼容说明：`docs/PROVIDER_API_COMPATIBILITY.md`
 - Docker 部署：`docs/DOCKER_DEPLOYMENT.md`
 - GUI 规格：`docs/GUI_SPECIFICATION.md`

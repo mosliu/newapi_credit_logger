@@ -140,3 +140,32 @@ def test_public_key_fragment_search() -> None:
     too_short = client.get("/ui/key-search", params={"key_fragment": "12345"})
     assert too_short.status_code == 200
     assert "至少 6 位 key 片段" in too_short.text
+
+
+def test_public_home_and_tool_config() -> None:
+    _reset_db_schema()
+    client = TestClient(app)
+
+    home = client.get("/ui")
+    assert home.status_code == 200
+    assert "普通用户查询首页" in home.text
+    assert "API 可用性测试工具" in home.text
+    assert "API 测试" in home.text
+    assert "Neko 查询" in home.text
+    assert "v0.1.1" in home.text
+
+    home_neko = client.get("/ui", params={"tab": "neko-query"})
+    assert home_neko.status_code == 200
+    assert 'id="homeNekoQuery" class="home-tab-panel active"' in home_neko.text
+
+    home_compat = client.get("/ui", params={"tab": "api-tools"})
+    assert home_compat.status_code == 200
+    assert 'id="homeApiTest" class="home-tab-panel active"' in home_compat.text
+
+    config = client.get("/api/config")
+    assert config.status_code == 200
+    payload = config.json()
+    assert payload["ok"] is True
+    assert "defaults" in payload
+    assert "llmParser" in payload
+    assert "nekoTool" in payload

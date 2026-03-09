@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.schemas.source import SourceCreate, SourceUpdate
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.services.admin_auth_service import (
     clear_admin_authenticated,
@@ -23,6 +24,7 @@ from app.tasks.scheduler_service import source_scheduler_service
 
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+templates.env.globals["app_version"] = get_settings().app_version
 
 
 def _as_optional(text: str | None) -> str | None:
