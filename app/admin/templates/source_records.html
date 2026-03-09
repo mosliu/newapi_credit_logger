@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}采集记录{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block content %}
+<section class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+            <h2 style="margin:0;">采集记录 - {{ source.name }}</h2>
+            <div class="muted">Owner: {{ source.key_owner }} | 地址: {{ source.base_url }}</div>
+        </div>
+        <a class="btn btn-muted" href="/admin/sources">返回列表</a>
+    </div>
+</section>
+
+<section class="card">
+    <form method="get" action="/admin/sources/{{ source.id }}/records" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input type="text" name="start_at" value="{{ start_at }}" placeholder="开始时间 ISO8601">
+        <input type="text" name="end_at" value="{{ end_at }}" placeholder="结束时间 ISO8601">
+        <button class="btn" type="submit">筛选</button>
+    </form>
+</section>
+
+<section class="card">
+    <canvas id="chart" height="80"></canvas>
+</section>
+
+<section class="card">
+    <h3 style="margin-top:0;">失败记录</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>时间</th>
+                <th>状态码</th>
+                <th>耗时(ms)</th>
+                <th>错误信息</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in failed_records %}
+            <tr>
+                <td>{{ row.checked_at }}</td>
+                <td>{{ row.http_status or "-" }}</td>
+                <td>{{ row.latency_ms or "-" }}</td>
+                <td>{{ row.error_message or "-" }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="4">无失败记录</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<section class="card">
+    <h3 style="margin-top:0;">最近记录</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>时间</th>
+                <th>成功</th>
+                <th>额度(元)</th>
+                <th>使用量(元)</th>
+                <th>余额</th>
+                <th>币种</th>
+                <th>状态码</th>
+                <th>耗时(ms)</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in records %}
+            <tr>
+                <td>{{ row.checked_at }}</td>
+                <td>{{ "是" if row.success else "否" }}</td>
+                <td>{{ row.limit_amount if row.limit_amount is not none else "-" }}</td>
+                <td>{{ row.usage_amount if row.usage_amount is not none else "-" }}</td>
+                <td>{{ row.balance if row.balance is not none else "-" }}</td>
+                <td>{{ row.currency or "-" }}</td>
+                <td>{{ row.http_status or "-" }}</td>
+                <td>{{ row.latency_ms or "-" }}</td>
+            </tr>
+        {% else %}
+            <tr><td colspan="8">无记录</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
+
+<script>
+const points = {{ chart_points | tojson }};
+const ctx = document.getElementById("chart");
+if (points.length > 0) {
+  new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: points.map(p => p.time),
+      datasets: [{
+        label: "余额趋势",
+        data: points.map(p => p.balance),
+        borderColor: "#165dff",
+        backgroundColor: "rgba(22,93,255,0.2)",
+        tension: 0.2
+      }]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }
+      }
+    }
+  });
+}
+</script>
+{% endblock %}

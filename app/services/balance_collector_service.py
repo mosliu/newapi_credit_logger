@@ -21,6 +21,8 @@ def collect_balance_for_source(db: Session, source: ApiKeySource) -> BalanceReco
     record = BalanceRecord(
         source_id=source.id,
         success=result.success,
+        limit_amount=result.limit_amount,
+        usage_amount=result.usage_amount,
         balance=result.balance,
         currency=result.currency,
         http_status=result.http_status,
@@ -33,11 +35,13 @@ def collect_balance_for_source(db: Session, source: ApiKeySource) -> BalanceReco
     db.refresh(record)
 
     logger.info(
-        "source_id={} success={} status={} latency_ms={} balance={} error={}",
+        "source_id={} success={} status={} latency_ms={} limit_amount={} usage_amount={} balance={} error={}",
         source.id,
         result.success,
         result.http_status,
         result.latency_ms,
+        result.limit_amount,
+        result.usage_amount,
         result.balance,
         result.error_message,
     )

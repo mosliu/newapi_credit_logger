@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 from loguru import logger
@@ -11,6 +12,13 @@ def configure_logging(settings: Settings) -> None:
 
     logger.remove()
     logger.configure(extra={"component": "app"})
+
+    logger.add(
+        sys.stderr,
+        level=settings.log_level.upper(),
+        enqueue=True,
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {extra[component]} | {message}",
+    )
 
     logger.add(
         log_dir / "app.log",
@@ -38,6 +46,16 @@ def configure_logging(settings: Settings) -> None:
         encoding="utf-8",
         enqueue=True,
         filter=lambda record: record["extra"].get("component") == "scheduler",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {extra[component]} | {message}",
+    )
+    logger.add(
+        log_dir / "upstream.log",
+        level=settings.log_level.upper(),
+        rotation=settings.log_rotation,
+        retention=settings.log_retention,
+        encoding="utf-8",
+        enqueue=True,
+        filter=lambda record: record["extra"].get("component") == "upstream",
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level:<8} | {extra[component]} | {message}",
     )
 

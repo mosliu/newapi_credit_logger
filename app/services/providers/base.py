@@ -6,6 +6,8 @@ from typing import Protocol
 @dataclass
 class BalanceFetchResult:
     success: bool
+    limit_amount: Decimal | None
+    usage_amount: Decimal | None
     balance: Decimal | None
     currency: str | None
     http_status: int | None

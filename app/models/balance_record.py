@@ -24,7 +24,9 @@ class BalanceRecord(Base):
         index=True,
     )
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
-    balance: Mapped[Decimal | None] = mapped_column(Numeric(20, 6), nullable=True)
+    limit_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
+    usage_amount: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
+    balance: Mapped[Decimal | None] = mapped_column(Numeric(20, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(20), nullable=True)
     http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)

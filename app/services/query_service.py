@@ -32,6 +32,8 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
                 "enabled": source.enabled,
                 "interval_seconds": source.interval_seconds,
                 "latest_success": latest.success if latest else None,
+                "latest_limit_amount": latest.limit_amount if latest else None,
+                "latest_usage_amount": latest.usage_amount if latest else None,
                 "latest_balance": latest.balance if latest else None,
                 "latest_currency": latest.currency if latest else None,
                 "latest_checked_at": latest.checked_at if latest else None,
@@ -72,6 +74,8 @@ def build_chart_points(records: list[BalanceRecord]) -> list[dict]:
         points.append(
             {
                 "time": item.checked_at.isoformat(),
+                "limit_amount": float(item.limit_amount) if item.limit_amount is not None else None,
+                "usage_amount": float(item.usage_amount) if item.usage_amount is not None else None,
                 "balance": value,
             }
         )

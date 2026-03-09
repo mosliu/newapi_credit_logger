@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<section class="card">
+    <h2 style="margin-top:0;">{{ title }}</h2>
+    <div class="muted">`api_key` 在编辑时留空表示保持不变。</div>
+</section>
+
+<section class="card">
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="{{ action_url }}">
+        <div class="grid">
+            <label>名称
+                <input type="text" name="name" required value="{{ form_data.name }}">
+            </label>
+            <label>Provider
+                <select name="provider_type">
+                    {% for option in provider_options %}
+                        <option value="{{ option.value }}" {% if form_data.provider_type == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>地址
+                <input type="text" name="base_url" required value="{{ form_data.base_url }}">
+            </label>
+            <label>API Key
+                <input type="text" name="api_key" value="{{ form_data.api_key }}">
+            </label>
+            <label>Owner
+                <input type="text" name="key_owner" required value="{{ form_data.key_owner }}">
+            </label>
+            <label>采集周期(秒)
+                <input type="number" min="10" max="86400" name="interval_seconds" required value="{{ form_data.interval_seconds }}">
+            </label>
+            <label>超时(秒)
+                <input type="number" min="1" max="120" name="timeout_seconds" required value="{{ form_data.timeout_seconds }}">
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;margin-top:30px;">
+                <input type="checkbox" name="enabled" style="width:auto;" {% if form_data.enabled %}checked{% endif %}>
+                启用监控
+            </label>
+        </div>
+        <label style="display:block;margin-top:12px;">备注
+            <textarea name="remark">{{ form_data.remark }}</textarea>
+        </label>
+
+        <div class="actions" style="margin-top:14px;">
+            <button class="btn" type="submit">保存</button>
+            <a class="btn btn-muted" href="/admin/sources">返回列表</a>
+        </div>
+    </form>
+</section>
+{% endblock %}

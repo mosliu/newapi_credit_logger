@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/newapi_credit_logger.db"
 
     log_dir: str = "logs"
-    log_level: str = "INFO"
+    log_level: str = "DEBUG"
     log_rotation: str = "00:00"
     log_retention: str = "30 days"
 
@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     default_request_retries: int = 2
 
     api_key_encrypt_secret: str = "change-me-in-production"
+    admin_password: str = "change-me-admin-password"
+    admin_session_secret: str = "change-me-admin-session-secret"
 
     model_config = SettingsConfigDict(
         env_file=".env",

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}后台管理{% endblock %}</title>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --card: #ffffff;
+            --line: #d9e2ec;
+            --text: #1f2933;
+            --muted: #52606d;
+            --primary: #165dff;
+            --danger: #d64545;
+            --ok: #188038;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: "Microsoft YaHei", sans-serif; }
+        .topbar { background: linear-gradient(120deg, #0f4c81, #165dff); color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .topbar a { color: #fff; text-decoration: none; margin-right: 16px; font-weight: 600; }
+        .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+        .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+        .muted { color: var(--muted); }
+        .btn { border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; text-decoration: none; display: inline-block; color: #fff; background: var(--primary); }
+        .btn-danger { background: var(--danger); }
+        .btn-muted { background: #6b7280; }
+        .btn-ok { background: var(--ok); }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+        input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+        textarea { min-height: 90px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #e6edf5; padding: 10px; text-align: left; vertical-align: top; }
+        form.inline { display: inline-block; }
+        .error { background: #fff1f1; border: 1px solid #f5c2c2; color: #a61b1b; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+<header class="topbar">
+    <div>
+        <a href="/admin/sources">后台管理</a>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div class="muted">NewAPI Credit Logger</div>
+        {% if is_admin_authenticated %}
+            <form method="post" action="/admin/logout" class="inline" style="margin:0;">
+                <button class="btn btn-muted" type="submit">退出登录</button>
+            </form>
+        {% endif %}
+    </div>
+</header>
+<main class="container">
+    {% block content %}{% endblock %}
+</main>
+</body>
+</html>

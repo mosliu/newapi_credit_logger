@@ -47,7 +47,9 @@
                 <td>{{ "启用" if item.enabled else "停用" }}</td>
                 <td>
                     {% if item.latest_balance is not none %}
-                        {{ item.latest_balance }} {{ item.latest_currency or "" }}
+                        余额: {{ item.latest_balance }} {{ item.latest_currency or "" }}<br>
+                        额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}<br>
+                        用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}
                     {% else %}
                         -
                     {% endif %}
