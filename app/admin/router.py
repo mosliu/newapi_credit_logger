@@ -52,6 +52,8 @@ def _render_form(
     action_url: str,
     title: str,
     error: str | None = None,
+    api_key_required: bool = False,
+    copied_from_source_id: int | None = None,
 ) -> HTMLResponse:
     return templates.TemplateResponse(
         request=request,
@@ -62,6 +64,8 @@ def _render_form(
             "error": error,
             "form_data": form_data,
             "provider_options": get_provider_options(),
+            "api_key_required": api_key_required,
+            "copied_from_source_id": copied_from_source_id,
             "is_admin_authenticated": is_admin_authenticated(request),
         },
         status_code=status.HTTP_400_BAD_REQUEST if error else status.HTTP_200_OK,
@@ -79,6 +83,25 @@ def _render_login_form(request: Request, error: str | None = None) -> HTMLRespon
         },
         status_code=status.HTTP_400_BAD_REQUEST if error else status.HTTP_200_OK,
     )
+
+
+def _default_form_data() -> dict:
+    return {
+        "name": "",
+        "provider_type": "newapi",
+        "base_url": "",
+        "api_key": "",
+        "key_owner": "",
+        "key_account": "",
+        "customer_info": "",
+        "key_created_at": "",
+        "fee_amount": "",
+        "fee_currency": "",
+        "remark": "",
+        "interval_seconds": "60",
+        "timeout_seconds": "20",
+        "enabled": True,
+    }
 
 
 @router.get("/login", response_class=HTMLResponse)
@@ -129,39 +152,78 @@ async def admin_sources(
 
 
 @router.get("/sources/new", response_class=HTMLResponse)
-async def admin_source_create_form(request: Request) -> HTMLResponse:
+async def admin_source_create_form(
+    request: Request,
+    copy_from: int | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    form_data = _default_form_data()
+    copied_from_source_id: int | None = None
+    if copy_from is not None:
+        source = get_source(db, copy_from)
+        if source is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
+        form_data.update(
+            {
+                "name": f"{source.name}-copy",
+                "provider_type": source.provider_type,
+                "base_url": source.base_url,
+                "key_owner": source.key_owner,
+                "key_account": source.key_account or "",
+                "customer_info": source.customer_info or "",
+                "key_created_at": (
+                    source.key_created_at.strftime("%Y-%m-%dT%H:%M") if source.key_created_at else ""
+                ),
+                "fee_amount": str(source.fee_amount) if source.fee_amount is not None else "",
+                "fee_currency": source.fee_currency or "",
+                "remark": source.remark or "",
+                "interval_seconds": str(source.interval_seconds),
+                "timeout_seconds": str(source.timeout_seconds),
+                "enabled": source.enabled,
+            }
+        )
+        copied_from_source_id = source.id
+
     return _render_form(
         request,
-        form_data={
-            "name": "",
-            "provider_type": "newapi",
-            "base_url": "",
-            "api_key": "",
-            "key_owner": "",
-            "remark": "",
-            "interval_seconds": "60",
-            "timeout_seconds": "20",
-            "enabled": True,
-        },
+        form_data=form_data,
         action_url="/admin/sources/new",
         title="新增监控源",
+        api_key_required=True,
+        copied_from_source_id=copied_from_source_id,
     )
 
 
 @router.post("/sources/new", response_class=HTMLResponse)
 async def admin_source_create(request: Request, db: Session = Depends(get_db)):
     form = await request.form()
+    raw_api_key = str(form.get("api_key", "")).strip()
     raw_payload = {
         "name": str(form.get("name", "")),
         "provider_type": str(form.get("provider_type", "newapi")),
         "base_url": str(form.get("base_url", "")),
-        "api_key": str(form.get("api_key", "")),
+        "api_key": raw_api_key,
         "key_owner": str(form.get("key_owner", "")),
+        "key_account": _as_optional(str(form.get("key_account", ""))),
+        "customer_info": _as_optional(str(form.get("customer_info", ""))),
+        "key_created_at": _as_optional(str(form.get("key_created_at", ""))),
+        "fee_amount": _as_optional(str(form.get("fee_amount", ""))),
+        "fee_currency": _as_optional(str(form.get("fee_currency", ""))),
         "remark": _as_optional(str(form.get("remark", ""))),
         "interval_seconds": str(form.get("interval_seconds", "60")),
         "timeout_seconds": str(form.get("timeout_seconds", "20")),
         "enabled": bool(form.get("enabled")),
     }
+
+    if not raw_api_key:
+        return _render_form(
+            request,
+            form_data=raw_payload,
+            action_url="/admin/sources/new",
+            title="新增监控源",
+            error="api_key 为必填项。",
+            api_key_required=True,
+        )
 
     try:
         payload = SourceCreate.model_validate(raw_payload)
@@ -173,6 +235,7 @@ async def admin_source_create(request: Request, db: Session = Depends(get_db)):
             action_url="/admin/sources/new",
             title="新增监控源",
             error=_validation_message(exc),
+            api_key_required=True,
         )
     except IntegrityError:
         db.rollback()
@@ -182,6 +245,7 @@ async def admin_source_create(request: Request, db: Session = Depends(get_db)):
             action_url="/admin/sources/new",
             title="新增监控源",
             error="名称已存在，请使用其他名称。",
+            api_key_required=True,
         )
 
     source_scheduler_service.reload_jobs()
@@ -204,6 +268,13 @@ async def admin_source_edit_form(
             "base_url": source.base_url,
             "api_key": "",
             "key_owner": source.key_owner,
+            "key_account": source.key_account or "",
+            "customer_info": source.customer_info or "",
+            "key_created_at": (
+                source.key_created_at.strftime("%Y-%m-%dT%H:%M") if source.key_created_at else ""
+            ),
+            "fee_amount": str(source.fee_amount) if source.fee_amount is not None else "",
+            "fee_currency": source.fee_currency or "",
             "remark": source.remark or "",
             "interval_seconds": str(source.interval_seconds),
             "timeout_seconds": str(source.timeout_seconds),
@@ -211,6 +282,7 @@ async def admin_source_edit_form(
         },
         action_url=f"/admin/sources/{source_id}/edit",
         title=f"编辑监控源 #{source_id}",
+        api_key_required=False,
     )
 
 
@@ -227,6 +299,11 @@ async def admin_source_edit(source_id: int, request: Request, db: Session = Depe
         "base_url": str(form.get("base_url", "")),
         "api_key": _as_optional(str(form.get("api_key", ""))),
         "key_owner": str(form.get("key_owner", "")),
+        "key_account": _as_optional(str(form.get("key_account", ""))),
+        "customer_info": _as_optional(str(form.get("customer_info", ""))),
+        "key_created_at": _as_optional(str(form.get("key_created_at", ""))),
+        "fee_amount": _as_optional(str(form.get("fee_amount", ""))),
+        "fee_currency": _as_optional(str(form.get("fee_currency", ""))),
         "remark": _as_optional(str(form.get("remark", ""))),
         "interval_seconds": str(form.get("interval_seconds", "60")),
         "timeout_seconds": str(form.get("timeout_seconds", "20")),
@@ -245,6 +322,7 @@ async def admin_source_edit(source_id: int, request: Request, db: Session = Depe
             action_url=f"/admin/sources/{source_id}/edit",
             title=f"编辑监控源 #{source_id}",
             error=_validation_message(exc),
+            api_key_required=False,
         )
     except IntegrityError:
         db.rollback()
@@ -254,6 +332,7 @@ async def admin_source_edit(source_id: int, request: Request, db: Session = Depe
             action_url=f"/admin/sources/{source_id}/edit",
             title=f"编辑监控源 #{source_id}",
             error="名称已存在，请使用其他名称。",
+            api_key_required=False,
         )
 
     source_scheduler_service.reload_jobs()

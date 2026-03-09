@@ -6,54 +6,338 @@
     <title>{% block title %}后台管理{% endblock %}</title>
     <style>
         :root {
-            --bg: #f4f7fb;
-            --card: #ffffff;
-            --line: #d9e2ec;
-            --text: #1f2933;
-            --muted: #52606d;
-            --primary: #165dff;
-            --danger: #d64545;
-            --ok: #188038;
+            color-scheme: light dark;
+            --bg: #dce9ff;
+            --bg-ink: #0f1728;
+            --bg-deep: #0b1323;
+            --panel: rgba(255, 255, 255, 0.72);
+            --panel-strong: rgba(255, 255, 255, 0.82);
+            --text: #10213e;
+            --muted: #4a5f85;
+            --line: rgba(16, 33, 62, 0.12);
+            --ring: rgba(0, 122, 255, 0.24);
+            --primary-top: #3f9bff;
+            --primary-bottom: #1167d8;
+            --danger-top: #ff6a74;
+            --danger-bottom: #d64053;
+            --ok-top: #31b875;
+            --ok-bottom: #12895f;
+            --shadow-window: 0 0 1px rgba(0, 0, 0, 0.4), 0 16px 36px -8px rgba(0, 0, 0, 0.2);
+            --shadow-card: 0 10px 26px -14px rgba(8, 26, 64, 0.28);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0d111a;
+                --bg-ink: #0a0f18;
+                --bg-deep: #070b12;
+                --panel: rgba(24, 31, 45, 0.72);
+                --panel-strong: rgba(29, 37, 53, 0.82);
+                --text: #e8edf7;
+                --muted: #9aabc9;
+                --line: rgba(255, 255, 255, 0.12);
+                --ring: rgba(64, 156, 255, 0.32);
+                --shadow-window: 0 0 1px rgba(255, 255, 255, 0.16), 0 20px 40px -10px rgba(0, 0, 0, 0.45);
+                --shadow-card: 0 12px 28px -14px rgba(0, 0, 0, 0.6);
+            }
         }
         * { box-sizing: border-box; }
-        body { margin: 0; background: var(--bg); color: var(--text); font-family: "Microsoft YaHei", sans-serif; }
-        .topbar { background: linear-gradient(120deg, #0f4c81, #165dff); color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
-        .topbar a { color: #fff; text-decoration: none; margin-right: 16px; font-weight: 600; }
-        .container { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
-        .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
-        .muted { color: var(--muted); }
-        .btn { border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; text-decoration: none; display: inline-block; color: #fff; background: var(--primary); }
-        .btn-danger { background: var(--danger); }
-        .btn-muted { background: #6b7280; }
-        .btn-ok { background: var(--ok); }
-        .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-        input, select, textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
-        textarea { min-height: 90px; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { border-bottom: 1px solid #e6edf5; padding: 10px; text-align: left; vertical-align: top; }
-        form.inline { display: inline-block; }
-        .error { background: #fff1f1; border: 1px solid #f5c2c2; color: #a61b1b; border-radius: 8px; padding: 10px; margin-bottom: 12px; }
-        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+        html, body { min-height: 100%; }
+        body {
+            margin: 0;
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background: radial-gradient(circle at 18% 8%, #ffffff66 0 20%, transparent 56%),
+                        radial-gradient(circle at 92% 12%, #4f86ff44 0 18%, transparent 48%),
+                        radial-gradient(circle at 78% 82%, #47c5ff44 0 14%, transparent 40%),
+                        linear-gradient(140deg, var(--bg) 0%, #d7e4ff 44%, #ccd9f5 100%);
+            padding: 20px 16px 26px;
+        }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            opacity: 0.018;
+            background-image:
+                repeating-radial-gradient(circle at 20% 20%, #000 0 0.4px, transparent 0.4px 3px),
+                repeating-radial-gradient(circle at 80% 70%, #000 0 0.35px, transparent 0.35px 2.8px);
+            z-index: 0;
+        }
+        .admin-shell {
+            position: relative;
+            z-index: 1;
+            width: min(1360px, 100%);
+            margin: 0 auto;
+        }
+        .glass-panel {
+            backdrop-filter: blur(24px) saturate(165%);
+            -webkit-backdrop-filter: blur(24px) saturate(165%);
+            background: var(--panel);
+            border-radius: 18px;
+            border: 0.5px solid var(--line);
+            box-shadow: var(--shadow-window), inset 0 1px 0 rgba(255, 255, 255, 0.44);
+        }
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 18px;
+            margin-bottom: 16px;
+        }
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+        .traffic-lights {
+            display: inline-flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .traffic-light {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 0 0 0.5px rgba(0, 0, 0, 0.22);
+        }
+        .traffic-light.red { background: linear-gradient(180deg, #ff7c7c, #f14343); }
+        .traffic-light.yellow { background: linear-gradient(180deg, #ffd874, #f2ae2f); }
+        .traffic-light.green { background: linear-gradient(180deg, #65e28d, #28b967); }
+        .brand-text {
+            min-width: 0;
+        }
+        .brand-title {
+            margin: 0;
+            font-size: 16px;
+            letter-spacing: -0.02em;
+            font-weight: 700;
+            text-decoration: none;
+            color: inherit;
+            display: inline-block;
+        }
+        .brand-subtitle {
+            margin: 2px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 0.04em;
+        }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+        .chip {
+            border-radius: 999px;
+            border: 0.5px solid var(--line);
+            background: var(--panel-strong);
+            padding: 6px 10px;
+            font-size: 12px;
+            color: var(--muted);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+        }
+        .container {
+            display: grid;
+            gap: 14px;
+        }
+        .card {
+            backdrop-filter: blur(18px) saturate(155%);
+            -webkit-backdrop-filter: blur(18px) saturate(155%);
+            background: var(--panel-strong);
+            border-radius: 16px;
+            border: 0.5px solid var(--line);
+            padding: 16px 18px;
+            box-shadow: var(--shadow-card), inset 0 1px 0 rgba(255, 255, 255, 0.42);
+        }
+        .card-title {
+            margin: 0;
+            font-size: 20px;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+        }
+        .muted {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .btn {
+            border: 0.5px solid rgba(255, 255, 255, 0.35);
+            border-radius: 10px;
+            padding: 8px 13px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            color: #fff;
+            font-weight: 600;
+            letter-spacing: 0.01em;
+            background: linear-gradient(180deg, var(--primary-top), var(--primary-bottom));
+            box-shadow: 0 6px 14px -8px rgba(16, 103, 216, 0.72), inset 0 0.5px 0 rgba(255, 255, 255, 0.28);
+            transition: transform 0.2s ease-out, filter 0.2s ease-out;
+        }
+        .btn:hover { filter: brightness(1.04); }
+        .btn:active { transform: scale(0.96); }
+        .btn-muted {
+            background: linear-gradient(180deg, #8799ba, #667a9f);
+            box-shadow: 0 6px 14px -8px rgba(54, 74, 108, 0.64), inset 0 0.5px 0 rgba(255, 255, 255, 0.28);
+        }
+        .btn-ok {
+            background: linear-gradient(180deg, var(--ok-top), var(--ok-bottom));
+            box-shadow: 0 6px 14px -8px rgba(18, 137, 95, 0.68), inset 0 0.5px 0 rgba(255, 255, 255, 0.3);
+        }
+        .btn-danger {
+            background: linear-gradient(180deg, var(--danger-top), var(--danger-bottom));
+            box-shadow: 0 6px 14px -8px rgba(214, 64, 83, 0.72), inset 0 0.5px 0 rgba(255, 255, 255, 0.28);
+        }
+        .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .actions.compact .btn { padding: 6px 10px; border-radius: 9px; font-size: 12px; }
+        form.inline { display: inline-flex; margin: 0; }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            display: grid;
+            gap: 6px;
+        }
+        input, select, textarea {
+            width: 100%;
+            border-radius: 10px;
+            border: 0.5px solid var(--line);
+            padding: 9px 10px;
+            background: rgba(255, 255, 255, 0.78);
+            color: inherit;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+            font: inherit;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+        @media (prefers-color-scheme: dark) {
+            input, select, textarea {
+                background: rgba(255, 255, 255, 0.08);
+            }
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: rgba(0, 122, 255, 0.42);
+            box-shadow: 0 0 0 4px var(--ring), inset 0 1px 2px rgba(0, 0, 0, 0.06);
+        }
+        textarea { min-height: 96px; resize: vertical; }
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 28px;
+        }
+        .checkbox-row input {
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            accent-color: #007aff;
+            box-shadow: none;
+        }
+        .table-wrap {
+            overflow: auto;
+            border-radius: 12px;
+            border: 0.5px solid var(--line);
+            background: rgba(255, 255, 255, 0.44);
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 980px;
+        }
+        th, td {
+            text-align: left;
+            padding: 11px 10px;
+            border-bottom: 0.5px solid var(--line);
+            vertical-align: top;
+            font-size: 13px;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.88);
+            font-size: 12px;
+            color: var(--muted);
+            letter-spacing: 0.04em;
+        }
+        @media (prefers-color-scheme: dark) {
+            th { background: rgba(23, 30, 43, 0.92); }
+        }
+        tbody tr:nth-child(even) { background: rgba(12, 33, 79, 0.04); }
+        .status-ok { color: #12895f; }
+        .status-bad { color: #c43850; }
+        .error {
+            background: rgba(255, 110, 124, 0.14);
+            border: 0.5px solid rgba(214, 64, 83, 0.4);
+            color: #c43850;
+            border-radius: 10px;
+            padding: 10px;
+            margin-bottom: 12px;
+        }
+        .reveal {
+            opacity: 0;
+            transform: translateY(8px);
+            animation: fade-up 420ms cubic-bezier(.22,.68,.2,1) forwards;
+        }
+        @keyframes fade-up {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        @media (max-width: 900px) {
+            body { padding: 14px 10px 20px; }
+            .topbar { padding: 12px; align-items: flex-start; gap: 8px; flex-direction: column; }
+            .topbar-right { width: 100%; justify-content: space-between; }
+            .grid { grid-template-columns: 1fr; }
+            .card { padding: 13px; }
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
-<header class="topbar">
-    <div>
-        <a href="/admin/sources">后台管理</a>
-    </div>
-    <div style="display:flex;align-items:center;gap:12px;">
-        <div class="muted">NewAPI Credit Logger</div>
-        {% if is_admin_authenticated %}
-            <form method="post" action="/admin/logout" class="inline" style="margin:0;">
-                <button class="btn btn-muted" type="submit">退出登录</button>
-            </form>
-        {% endif %}
-    </div>
-</header>
-<main class="container">
-    {% block content %}{% endblock %}
-</main>
+<div class="admin-shell">
+    <header class="topbar glass-panel reveal">
+        <div class="topbar-left">
+            <div class="traffic-lights" aria-hidden="true">
+                <span class="traffic-light red"></span>
+                <span class="traffic-light yellow"></span>
+                <span class="traffic-light green"></span>
+            </div>
+            <div class="brand-text">
+                <a class="brand-title" href="/admin/sources">NewAPI Credit Logger</a>
+                <p class="brand-subtitle">macOS style admin console</p>
+            </div>
+        </div>
+        <div class="topbar-right">
+            <span class="chip">后台管理</span>
+            {% if is_admin_authenticated %}
+                <form method="post" action="/admin/logout" class="inline">
+                    <button class="btn btn-muted" type="submit">退出登录</button>
+                </form>
+            {% endif %}
+        </div>
+    </header>
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+</div>
+<script>
+document.querySelectorAll(".reveal").forEach((node, index) => {
+  node.style.animationDelay = `${Math.min(index * 70, 320)}ms`;
+});
+</script>
+{% block scripts %}{% endblock %}
 </body>
 </html>

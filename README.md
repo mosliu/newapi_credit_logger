@@ -4,7 +4,7 @@
 
 ## 功能概览
 
-- 支持多监控源配置：`base_url`、`api_key`、`interval_seconds`、`enabled`、`key_owner`、`remark`
+- 支持多监控源配置：`base_url`、`api_key`、`interval_seconds`、`enabled`、`key_owner`、`key_account`、`customer_info`、`key_created_at`、`fee_amount`、`fee_currency`、`remark`
 - 支持多 Provider / 多版本接口：
   - `newapi`：新版 NewAPI，走 `/api/user/self`
   - `newapi_legacy`：旧版 NewAPI，优先走 `subscription + usage`
@@ -15,7 +15,9 @@
   - `使用量(usage_amount)`
   - `余额(balance)`
 - 后台管理系统 `/admin`，支持登录保护
+- 后台支持“复制新增”监控源（复制除 `api_key` 外的配置）
 - 前台查询页面 `/ui/sources`
+- 普通用户查询页面 `/ui/key-search`（按 key 前缀/后缀片段匹配，结果仅展示脱敏 key）
 - 调试日志、错误日志、上游请求日志分文件输出
 - 支持 SQLite / MySQL / PostgreSQL
 
@@ -108,6 +110,7 @@ uv run python "main.py"
 
 - API：`http://127.0.0.1:8000/api`
 - 前台：`http://127.0.0.1:8000/ui/sources`
+- 普通用户 Key 查询：`http://127.0.0.1:8000/ui/key-search`
 - 后台：`http://127.0.0.1:8000/admin`
 
 ## 后台登录
@@ -164,6 +167,14 @@ ADMIN_PASSWORD=...
 - 非 JSON 响应错误
 
 ## 数据库说明
+
+当前 `api_key_source` 额外支持业务元数据字段：
+
+- `key_account`
+- `customer_info`
+- `key_created_at`
+- `fee_amount`
+- `fee_currency`
 
 当前 `balance_record` 记录字段包括：
 

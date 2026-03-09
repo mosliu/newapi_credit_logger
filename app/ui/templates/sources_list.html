@@ -1,74 +1,70 @@
-<!doctype html>
-<html lang="zh-CN">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>监控列表</title>
-    <style>
-        body { font-family: "Microsoft YaHei", sans-serif; margin: 24px; background: #f7fafc; color: #1a202c; }
-        .panel { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
-        h1 { margin-top: 0; }
-        .filters { display: flex; gap: 12px; margin-bottom: 16px; }
-        input, button { padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e0; }
-        button { background: #0f766e; color: #fff; border: 0; cursor: pointer; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #edf2f7; vertical-align: top; }
-        .ok { color: #047857; }
-        .bad { color: #b91c1c; }
-    </style>
-</head>
-<body>
-<div class="panel">
-    <h1>监控列表</h1>
-    <form class="filters" method="get" action="/ui/sources">
+{% extends "base.html" %}
+{% block title %}监控列表{% endblock %}
+{% block content %}
+<section class="panel reveal">
+    <h2>监控列表</h2>
+    <div class="muted">按 Owner 快速过滤，并查看最近一次采集结果。</div>
+</section>
+
+<section class="panel reveal">
+    <form class="toolbar" method="get" action="/ui/sources">
         <input type="text" name="key_owner" placeholder="按 key_owner 过滤" value="{{ key_owner }}">
         <button type="submit">查询</button>
     </form>
-    <table>
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th>名称</th>
-            <th>Owner</th>
-            <th>地址</th>
-            <th>状态</th>
-            <th>最新余额</th>
-            <th>最近采集</th>
-            <th>操作</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for item in rows %}
+</section>
+
+<section class="panel reveal">
+    <div class="table-wrap">
+        <table>
+            <thead>
             <tr>
-                <td>{{ item.id }}</td>
-                <td>{{ item.name }}</td>
-                <td>{{ item.key_owner }}</td>
-                <td>{{ item.base_url }}</td>
-                <td>{{ "启用" if item.enabled else "停用" }}</td>
-                <td>
-                    {% if item.latest_balance is not none %}
-                        余额: {{ item.latest_balance }} {{ item.latest_currency or "" }}<br>
-                        额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}<br>
-                        用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}
-                    {% else %}
-                        -
-                    {% endif %}
-                </td>
-                <td>
-                    {% if item.latest_checked_at %}{{ item.latest_checked_at }}{% else %}-{% endif %}
-                    {% if item.latest_success is sameas true %}
-                        <div class="ok">成功</div>
-                    {% elif item.latest_success is sameas false %}
-                        <div class="bad">失败: {{ item.latest_error or "-" }}</div>
-                    {% endif %}
-                </td>
-                <td><a href="/ui/sources/{{ item.id }}">查看详情</a></td>
+                <th>ID</th>
+                <th>名称</th>
+                <th>Owner / 账号</th>
+                <th>客户信息</th>
+                <th>地址</th>
+                <th>状态</th>
+                <th>最新余额</th>
+                <th>最近采集</th>
+                <th>操作</th>
             </tr>
-        {% else %}
-            <tr><td colspan="8">暂无数据</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
-</div>
-</body>
-</html>
+            </thead>
+            <tbody>
+            {% for item in rows %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>
+                        {{ item.key_owner }}<br>
+                        <span class="muted">账号: {{ item.key_account or "-" }}</span>
+                    </td>
+                    <td>{{ item.customer_info or "-" }}</td>
+                    <td>{{ item.base_url }}</td>
+                    <td>{{ "启用" if item.enabled else "停用" }}</td>
+                    <td>
+                        {% if item.latest_balance is not none %}
+                            余额: {{ item.latest_balance }} {{ item.latest_currency or "" }}<br>
+                            额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}<br>
+                            用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.latest_checked_at %}{{ item.latest_checked_at }}{% else %}-{% endif %}
+                        {% if item.latest_success is sameas true %}
+                            <div class="ok">成功</div>
+                        {% elif item.latest_success is sameas false %}
+                            <div class="bad">失败: {{ item.latest_error or "-" }}</div>
+                        {% endif %}
+                    </td>
+                    <td><a class="btn" href="/ui/sources/{{ item.id }}">查看详情</a></td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9">暂无数据</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

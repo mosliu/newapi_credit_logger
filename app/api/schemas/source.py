@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
@@ -11,6 +12,11 @@ class SourceBase(BaseModel):
     provider_type: str = Field(default="newapi", min_length=1, max_length=30)
     base_url: str = Field(min_length=1, max_length=255)
     key_owner: str = Field(min_length=1, max_length=100)
+    key_account: str | None = Field(default=None, max_length=120)
+    customer_info: str | None = Field(default=None, max_length=255)
+    key_created_at: datetime | None = None
+    fee_amount: Decimal | None = Field(default=None, ge=0, max_digits=20, decimal_places=2)
+    fee_currency: str | None = Field(default=None, max_length=20)
     remark: str | None = Field(default=None, max_length=500)
     interval_seconds: int = Field(default=60, ge=10, le=86400)
     timeout_seconds: int = Field(default=20, ge=1, le=120)
@@ -35,6 +41,11 @@ class SourceUpdate(BaseModel):
     base_url: str | None = Field(default=None, min_length=1, max_length=255)
     api_key: str | None = Field(default=None, min_length=1, max_length=512)
     key_owner: str | None = Field(default=None, min_length=1, max_length=100)
+    key_account: str | None = Field(default=None, max_length=120)
+    customer_info: str | None = Field(default=None, max_length=255)
+    key_created_at: datetime | None = None
+    fee_amount: Decimal | None = Field(default=None, ge=0, max_digits=20, decimal_places=2)
+    fee_currency: str | None = Field(default=None, max_length=20)
     remark: str | None = Field(default=None, max_length=500)
     interval_seconds: int | None = Field(default=None, ge=10, le=86400)
     timeout_seconds: int | None = Field(default=None, ge=1, le=120)

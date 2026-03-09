@@ -5,10 +5,17 @@ from app.services.providers.compatible_billing_provider import CompatibleBilling
 
 
 class _FakeResponse:
-    def __init__(self, status_code: int, payload: dict, text: str | None = None):
+    def __init__(
+        self,
+        status_code: int,
+        payload: dict,
+        text: str | None = None,
+        headers: dict[str, str] | None = None,
+    ):
         self.status_code = status_code
         self._payload = payload
         self.text = text or str(payload)
+        self.headers = headers or {"content-type": "application/json"}
 
     def json(self) -> dict:
         return self._payload

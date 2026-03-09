@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Key片段查询{% endblock %}
+{% block content %}
+<section class="panel reveal">
+    <h2>普通用户 Key 片段查询</h2>
+    <div class="muted">
+        无需登录。建议输入 Key 后缀至少 6 位，或前缀至少 8 位，系统会尽量匹配。
+    </div>
+</section>
+
+<section class="panel reveal">
+    {% if error %}
+        <div class="bad" style="margin-bottom:10px;">{{ error }}</div>
+    {% endif %}
+    <form class="toolbar" method="get" action="/ui/key-search">
+        <input type="text" name="key_fragment" value="{{ key_fragment }}" placeholder="输入 key 片段">
+        <button type="submit">查询</button>
+    </form>
+</section>
+
+<section class="panel reveal">
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th>名称</th>
+                <th>匹配方式</th>
+                <th>Key(脱敏)</th>
+                <th>Owner</th>
+                <th>Key额度</th>
+                <th>Key余额</th>
+                <th>最新使用量</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in rows %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.match_hint }}</td>
+                    <td>{{ item.api_key_masked }}</td>
+                    <td>{{ item.key_owner }}</td>
+                    <td>{{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}</td>
+                    <td>{{ item.latest_balance if item.latest_balance is not none else "-" }}</td>
+                    <td>{{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="7">暂无匹配结果</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

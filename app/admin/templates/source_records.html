@@ -4,17 +4,21 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 {% endblock %}
 {% block content %}
-<section class="card">
+<section class="card reveal">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <div>
-            <h2 style="margin:0;">采集记录 - {{ source.name }}</h2>
-            <div class="muted">Owner: {{ source.key_owner }} | 地址: {{ source.base_url }}</div>
+            <h2 class="card-title">采集记录 - {{ source.name }}</h2>
+            <div class="muted">
+                Owner: {{ source.key_owner }} |
+                账号: {{ source.key_account or "-" }} |
+                地址: {{ source.base_url }}
+            </div>
         </div>
         <a class="btn btn-muted" href="/admin/sources">返回列表</a>
     </div>
 </section>
 
-<section class="card">
+<section class="card reveal">
     <form method="get" action="/admin/sources/{{ source.id }}/records" style="display:flex;gap:10px;flex-wrap:wrap;">
         <input type="text" name="start_at" value="{{ start_at }}" placeholder="开始时间 ISO8601">
         <input type="text" name="end_at" value="{{ end_at }}" placeholder="结束时间 ISO8601">
@@ -22,90 +26,107 @@
     </form>
 </section>
 
-<section class="card">
+<section class="card reveal">
     <canvas id="chart" height="80"></canvas>
 </section>
 
-<section class="card">
-    <h3 style="margin-top:0;">失败记录</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>时间</th>
-                <th>状态码</th>
-                <th>耗时(ms)</th>
-                <th>错误信息</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for row in failed_records %}
-            <tr>
-                <td>{{ row.checked_at }}</td>
-                <td>{{ row.http_status or "-" }}</td>
-                <td>{{ row.latency_ms or "-" }}</td>
-                <td>{{ row.error_message or "-" }}</td>
-            </tr>
-        {% else %}
-            <tr><td colspan="4">无失败记录</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<section class="card reveal">
+    <h3 class="card-title" style="font-size:18px;">失败记录</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>状态码</th>
+                    <th>耗时(ms)</th>
+                    <th>错误信息</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in failed_records %}
+                <tr>
+                    <td>{{ row.checked_at }}</td>
+                    <td>{{ row.http_status or "-" }}</td>
+                    <td>{{ row.latency_ms or "-" }}</td>
+                    <td>{{ row.error_message or "-" }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4">无失败记录</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
 
-<section class="card">
-    <h3 style="margin-top:0;">最近记录</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>时间</th>
-                <th>成功</th>
-                <th>额度(元)</th>
-                <th>使用量(元)</th>
-                <th>余额</th>
-                <th>币种</th>
-                <th>状态码</th>
-                <th>耗时(ms)</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for row in records %}
-            <tr>
-                <td>{{ row.checked_at }}</td>
-                <td>{{ "是" if row.success else "否" }}</td>
-                <td>{{ row.limit_amount if row.limit_amount is not none else "-" }}</td>
-                <td>{{ row.usage_amount if row.usage_amount is not none else "-" }}</td>
-                <td>{{ row.balance if row.balance is not none else "-" }}</td>
-                <td>{{ row.currency or "-" }}</td>
-                <td>{{ row.http_status or "-" }}</td>
-                <td>{{ row.latency_ms or "-" }}</td>
-            </tr>
-        {% else %}
-            <tr><td colspan="8">无记录</td></tr>
-        {% endfor %}
-        </tbody>
-    </table>
+<section class="card reveal">
+    <h3 class="card-title" style="font-size:18px;">最近记录</h3>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>成功</th>
+                    <th>额度(元)</th>
+                    <th>使用量(元)</th>
+                    <th>余额</th>
+                    <th>币种</th>
+                    <th>状态码</th>
+                    <th>耗时(ms)</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in records %}
+                <tr>
+                    <td>{{ row.checked_at }}</td>
+                    <td>{{ "是" if row.success else "否" }}</td>
+                    <td>{{ row.limit_amount if row.limit_amount is not none else "-" }}</td>
+                    <td>{{ row.usage_amount if row.usage_amount is not none else "-" }}</td>
+                    <td>{{ row.balance if row.balance is not none else "-" }}</td>
+                    <td>{{ row.currency or "-" }}</td>
+                    <td>{{ row.http_status or "-" }}</td>
+                    <td>{{ row.latency_ms or "-" }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="8">无记录</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </section>
-
+{% endblock %}
+{% block scripts %}
 <script>
 const points = {{ chart_points | tojson }};
-const ctx = document.getElementById("chart");
+const canvas = document.getElementById("chart");
 if (points.length > 0) {
-  new Chart(ctx, {
+  new Chart(canvas, {
     type: "line",
     data: {
-      labels: points.map(p => p.time),
+      labels: points.map((p) => p.time),
       datasets: [{
         label: "余额趋势",
-        data: points.map(p => p.balance),
-        borderColor: "#165dff",
-        backgroundColor: "rgba(22,93,255,0.2)",
-        tension: 0.2
+        data: points.map((p) => p.balance),
+        borderColor: "#0a84ff",
+        backgroundColor: "rgba(10,132,255,0.22)",
+        pointRadius: 1.5,
+        tension: 0.28,
+        fill: true
       }]
     },
     options: {
       responsive: true,
+      plugins: {
+        legend: { labels: { color: getComputedStyle(document.documentElement).getPropertyValue("--muted").trim() || "#667" } }
+      },
       scales: {
-        x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 } }
+        x: {
+          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8, color: "#7c8bab" },
+          grid: { color: "rgba(90, 120, 170, 0.16)" }
+        },
+        y: {
+          ticks: { color: "#7c8bab" },
+          grid: { color: "rgba(90, 120, 170, 0.16)" }
+        }
       }
     }
   });

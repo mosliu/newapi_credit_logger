@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.api_key_source import ApiKeySource
 from app.models.balance_record import BalanceRecord
+from app.services.crypto_service import decrypt_api_key, mask_api_key
 
 
 def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dict]:
@@ -28,6 +29,11 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
                 "provider_type": source.provider_type,
                 "base_url": source.base_url,
                 "key_owner": source.key_owner,
+                "key_account": source.key_account,
+                "customer_info": source.customer_info,
+                "key_created_at": source.key_created_at,
+                "fee_amount": source.fee_amount,
+                "fee_currency": source.fee_currency,
                 "remark": source.remark,
                 "enabled": source.enabled,
                 "interval_seconds": source.interval_seconds,
@@ -41,6 +47,72 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
             }
         )
     return rows
+
+
+def search_sources_by_key_fragment(db: Session, key_fragment: str) -> tuple[list[dict], str | None]:
+    fragment = key_fragment.strip()
+    if not fragment:
+        return [], None
+    if len(fragment) < 6:
+        return [], "请输入至少 6 位 key 片段（后缀 6 位或前缀 8 位更易匹配）。"
+
+    rows: list[dict] = []
+    for source in db.query(ApiKeySource).order_by(ApiKeySource.id.desc()).all():
+        try:
+            raw_api_key = decrypt_api_key(source.api_key_encrypted)
+        except Exception:  # noqa: BLE001
+            continue
+
+        score = _match_score(raw_api_key, fragment)
+        if score <= 0:
+            continue
+        latest = (
+            db.query(BalanceRecord)
+            .filter(BalanceRecord.source_id == source.id)
+            .order_by(BalanceRecord.checked_at.desc(), BalanceRecord.id.desc())
+            .first()
+        )
+
+        rows.append(
+            {
+                "id": source.id,
+                "name": source.name,
+                "key_owner": source.key_owner,
+                "api_key_masked": mask_api_key(raw_api_key),
+                "match_hint": _match_hint(raw_api_key, fragment),
+                "latest_limit_amount": latest.limit_amount if latest else None,
+                "latest_usage_amount": latest.usage_amount if latest else None,
+                "latest_balance": latest.balance if latest else None,
+                "score": score,
+            }
+        )
+
+    rows.sort(key=lambda item: (item["score"], item["id"]), reverse=True)
+    for row in rows:
+        row.pop("score", None)
+    return rows, None
+
+
+def _match_score(raw_api_key: str, fragment: str) -> int:
+    if len(fragment) >= 8 and raw_api_key.startswith(fragment):
+        return 300 + len(fragment)
+    if len(fragment) >= 6 and raw_api_key.endswith(fragment):
+        return 200 + len(fragment)
+    if len(fragment) >= 8 and fragment in raw_api_key:
+        return 100 + len(fragment)
+    if len(fragment) >= 6 and fragment in raw_api_key:
+        return 50 + len(fragment)
+    return 0
+
+
+def _match_hint(raw_api_key: str, fragment: str) -> str:
+    if len(fragment) >= 8 and raw_api_key.startswith(fragment):
+        return "前缀匹配"
+    if len(fragment) >= 6 and raw_api_key.endswith(fragment):
+        return "后缀匹配"
+    if fragment in raw_api_key:
+        return "片段包含匹配"
+    return "未匹配"
 
 
 def get_source_detail(

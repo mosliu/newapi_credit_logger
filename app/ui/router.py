@@ -7,7 +7,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.services.query_service import build_chart_points, get_source_detail, list_source_dashboard
+from app.services.query_service import (
+    build_chart_points,
+    get_source_detail,
+    list_source_dashboard,
+    search_sources_by_key_fragment,
+)
 
 router = APIRouter(prefix="/ui")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -51,5 +56,27 @@ async def source_detail(
             "chart_points": chart_points,
             "start_at": start_at.isoformat() if start_at else "",
             "end_at": end_at.isoformat() if end_at else "",
+        },
+    )
+
+
+@router.get("/key-search", response_class=HTMLResponse)
+async def key_search(
+    request: Request,
+    key_fragment: str | None = Query(default=None),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    rows: list[dict] = []
+    error: str | None = None
+    if key_fragment:
+        rows, error = search_sources_by_key_fragment(db, key_fragment=key_fragment)
+
+    return templates.TemplateResponse(
+        request=request,
+        name="key_search.html",
+        context={
+            "key_fragment": key_fragment or "",
+            "rows": rows,
+            "error": error,
         },
     )
