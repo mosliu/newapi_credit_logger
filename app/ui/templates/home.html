@@ -2,42 +2,6 @@
 {% block title %}普通用户首页{% endblock %}
 {% block head %}
 <style>
-    .segmented {
-        display: inline-flex;
-        gap: 3px;
-        padding: 3px;
-        border-radius: 12px;
-        border: 0.5px solid var(--line);
-        background: rgba(255, 255, 255, 0.5);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
-    }
-    @media (prefers-color-scheme: dark) {
-        .segmented {
-            background: rgba(255, 255, 255, 0.08);
-        }
-    }
-    .segment-btn {
-        border: 0;
-        background: transparent;
-        color: var(--muted);
-        font-weight: 600;
-        letter-spacing: 0.01em;
-        padding: 8px 12px;
-        border-radius: 9px;
-        cursor: pointer;
-        transition: all .2s cubic-bezier(.22,.68,.2,1);
-    }
-    .segment-btn.active {
-        color: var(--text);
-        background: rgba(255, 255, 255, 0.86);
-        box-shadow: 0 4px 14px -9px rgba(6, 25, 62, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.55);
-    }
-    @media (prefers-color-scheme: dark) {
-        .segment-btn.active {
-            background: rgba(61, 73, 95, 0.86);
-            color: #f0f4fb;
-        }
-    }
     .home-tab-panel {
         display: none;
     }
@@ -219,54 +183,13 @@
         .kv-grid {
             grid-template-columns: 1fr;
         }
-        .segmented {
-            width: 100%;
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-        .segment-btn {
-            width: 100%;
-        }
     }
 </style>
 {% endblock %}
 {% block content %}
-<section class="panel reveal">
-    <h2>普通用户查询首页</h2>
-    <div class="muted">默认入口为 Key 片段查询；API 测试与 Neko 查询已提升为一级标签。</div>
-    <div class="segmented" role="tablist" aria-label="首页功能标签" style="margin-top:12px;">
-        <button
-            type="button"
-            role="tab"
-            class="segment-btn home-tab-btn {% if active_tab == 'key-search' %}active{% endif %}"
-            data-home-target="homeKeySearch"
-            aria-selected="{{ 'true' if active_tab == 'key-search' else 'false' }}"
-        >
-            Key 片段查询
-        </button>
-        <button
-            type="button"
-            role="tab"
-            class="segment-btn home-tab-btn {% if active_tab == 'api-test' %}active{% endif %}"
-            data-home-target="homeApiTest"
-            aria-selected="{{ 'true' if active_tab == 'api-test' else 'false' }}"
-        >
-            API 测试
-        </button>
-        <button
-            type="button"
-            role="tab"
-            class="segment-btn home-tab-btn {% if active_tab == 'neko-query' %}active{% endif %}"
-            data-home-target="homeNekoQuery"
-            aria-selected="{{ 'true' if active_tab == 'neko-query' else 'false' }}"
-        >
-            Neko 查询
-        </button>
-    </div>
-</section>
-
 <section id="homeKeySearch" class="home-tab-panel {% if active_tab == 'key-search' %}active{% endif %}">
     <section class="panel reveal">
+        <h2>Key 查询（片段匹配）</h2>
         {% if error %}
             <div class="bad" style="margin-bottom:10px;">{{ error }}</div>
         {% endif %}
@@ -276,7 +199,7 @@
             <button type="submit">查询</button>
         </form>
         <div class="muted" style="margin-top:8px;">
-            无需登录。建议输入 Key 后缀至少 6 位，或前缀至少 8 位，系统会尽量匹配。
+            无需登录。为了安全起见，建议输入 Key 前 12 位与后 12 位（各至少 12 位），系统会尽量匹配。
         </div>
     </section>
 
@@ -384,24 +307,31 @@
 
 <section id="homeNekoQuery" class="home-tab-panel {% if active_tab == 'neko-query' %}active{% endif %}">
     <section class="panel reveal">
-        <h2>Neko API Key 查询</h2>
-        <div class="muted">完整复制自 `html_api_test`：令牌信息、调用日志、复制与 CSV 导出。</div>
+        <h2>API Key 查询</h2>
+        <div class="muted">NewAPI Token 信息与调用日志查询，支持新版/老版切换、复制与 CSV 导出。</div>
     </section>
 
     <section>
         <section class="panel reveal">
             <p id="nekoConfigInfo" class="muted">等待加载配置...</p>
             <div class="grid" style="margin-top:10px;">
-                <div class="field">
+                <div class="field full">
                     <label for="nekoBaseUrl">NewAPI 地址（Base URL）</label>
                     <input id="nekoBaseUrl" type="text" placeholder="https://newapi.example.com">
+                </div>
+                <div class="field">
+                    <label for="nekoVariant">NewAPI 版本</label>
+                    <select id="nekoVariant">
+                        <option value="newapi" selected>NewAPI 新版</option>
+                        <option value="newapi_legacy">NewAPI 老版</option>
+                    </select>
                 </div>
                 <div class="field">
                     <label for="nekoTimeout">超时（秒）</label>
                     <input id="nekoTimeout" type="number" min="3" max="120" step="1" value="30">
                 </div>
                 <div class="field full">
-                    <label for="nekoToken">Token</label>
+                    <label for="nekoToken">API Key / Token</label>
                     <input id="nekoToken" type="password" placeholder="sk-xxxxxxxxxxxx">
                 </div>
                 <div class="field full">
@@ -504,12 +434,6 @@ const state = {
 };
 
 const el = {
-  homeTabBtns:      Array.from(document.querySelectorAll(".home-tab-btn")),
-  homeTabPanels:    Array.from(document.querySelectorAll(".home-tab-panel")),
-
-  homeTabField:     document.getElementById("homeTabField"),
-  keyFragmentInput: document.getElementById("keyFragmentInput"),
-
   rawInput:         document.getElementById("rawInput"),
   channel:          document.getElementById("channel"),
   cliProfile:       document.getElementById("cliProfile"),
@@ -526,6 +450,7 @@ const el = {
 
   nekoConfigInfo:   document.getElementById("nekoConfigInfo"),
   nekoBaseUrl:      document.getElementById("nekoBaseUrl"),
+  nekoVariant:      document.getElementById("nekoVariant"),
   nekoTimeout:      document.getElementById("nekoTimeout"),
   nekoToken:        document.getElementById("nekoToken"),
   nekoFetchBalance: document.getElementById("nekoFetchBalance"),
@@ -592,26 +517,6 @@ function renderNekoMeta(meta, ok) {
 
 function renderNekoBody(obj) {
   el.nekoResultBody.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
-}
-
-function switchHomeTab(targetId) {
-  el.homeTabBtns.forEach((btn) => {
-    const active = btn.dataset.homeTarget === targetId;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-selected", active ? "true" : "false");
-  });
-  el.homeTabPanels.forEach((panel) => {
-    panel.classList.toggle("active", panel.id === targetId);
-  });
-  if (el.homeTabField) {
-    if (targetId === "homeApiTest") {
-      el.homeTabField.value = "api-test";
-    } else if (targetId === "homeNekoQuery") {
-      el.homeTabField.value = "neko-query";
-    } else {
-      el.homeTabField.value = "key-search";
-    }
-  }
 }
 
 function withLoading(btn, label, asyncFn) {
@@ -751,7 +656,7 @@ function applyNekoConfig(nekoCfg) {
 
   if (!enabledFeatures) {
     el.nekoQueryBtn.disabled = true;
-    el.nekoConfigInfo.textContent = "Neko 查询项都被禁用（NEKO_SHOW_BALANCE/NEKO_SHOW_DETAIL）。";
+    el.nekoConfigInfo.textContent = "API Key 查询项都被禁用（NEKO_SHOW_BALANCE/NEKO_SHOW_DETAIL）。";
     return;
   }
 
@@ -982,6 +887,7 @@ el.nekoQueryBtn.addEventListener(
   withLoading(el.nekoQueryBtn, "查询", async () => {
     const token = el.nekoToken.value.trim();
     const baseUrl = el.nekoBaseUrl.value.trim();
+    const variant = (el.nekoVariant && el.nekoVariant.value) ? el.nekoVariant.value : "newapi";
     const timeoutSec = Number(el.nekoTimeout.value || runtime.neko.timeoutSec || 30);
     const fetchBalance = !!el.nekoFetchBalance.checked;
     const fetchDetail = !!el.nekoFetchDetail.checked;
@@ -1006,6 +912,7 @@ el.nekoQueryBtn.addEventListener(
       const result = await postJson("/api/neko/query", {
         token,
         base_url: baseUrl,
+        variant,
         fetch_balance: fetchBalance,
         fetch_detail: fetchDetail,
         timeout_sec: Number.isFinite(timeoutSec) ? timeoutSec : runtime.neko.timeoutSec
@@ -1020,6 +927,7 @@ el.nekoQueryBtn.addEventListener(
 
       const errors = Array.isArray(result.errors) ? result.errors : [];
       const statusLine = [
+        `variant=${result.variant || variant}`,
         `baseUrl=${result.baseUrl || baseUrl}`,
         `token=${result.tokenMasked || maskKey(token)}`,
         `logs=${(result.stats && result.stats.logCount) || state.nekoLogs.length}`
@@ -1079,13 +987,6 @@ el.nekoExportBtn.addEventListener("click", () => {
   ]);
   downloadCsv("neko_logs.csv", headers, rows);
   renderNekoMeta(`已导出 ${rows.length} 条日志。`, true);
-});
-
-el.homeTabBtns.forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const target = btn.dataset.homeTarget;
-    if (target) switchHomeTab(target);
-  });
 });
 
 async function initApp() {

@@ -22,7 +22,7 @@ class ApiKeySource(Base):
     fee_amount: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=2), nullable=True)
     fee_currency: Mapped[str | None] = mapped_column(String(20), nullable=True)
     remark: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
     timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(

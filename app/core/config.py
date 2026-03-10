@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "NewAPI Credit Logger"
-    app_version: str = "0.1.1"
+    app_version: str = "0.1.2"
     app_env: str = "dev"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     log_rotation: str = "00:00"
     log_retention: str = "30 days"
 
-    default_poll_interval_seconds: int = 60
+    default_poll_interval_seconds: int = 300
     default_request_timeout_seconds: int = 20
     default_request_retries: int = 2
 

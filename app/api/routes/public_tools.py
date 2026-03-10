@@ -194,6 +194,7 @@ async def neko_query(request: Request, req: NekoQueryRequest) -> dict[str, Any]:
             config=neko_config,
             token=req.token,
             base_url=req.base_url,
+            variant=req.variant,
             fetch_balance=req.fetch_balance,
             fetch_detail=req.fetch_detail,
             timeout_sec=req.timeout_sec,

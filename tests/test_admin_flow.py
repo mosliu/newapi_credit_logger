@@ -22,7 +22,7 @@ def test_admin_source_management_flow() -> None:
 
     login_page = client.get("/admin/login")
     assert login_page.status_code == 200
-    assert "v0.1.1" in login_page.text
+    assert "v0.1.2" in login_page.text
 
     login = client.post(
         "/admin/login",

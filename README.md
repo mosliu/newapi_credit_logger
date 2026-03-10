@@ -16,8 +16,8 @@
   - `余额(balance)`
 - 后台管理系统 `/admin`，支持登录保护
 - 后台支持“复制新增”监控源（复制除 `api_key` 外的配置）
-- 前台查询页面 `/ui/sources`
-- 普通用户首页 `/ui`（多 Tab：`Key 片段查询`、`API 测试`、`Neko 查询`）
+- 后台监控列表 `/admin/sources`（需登录）
+- 普通用户首页 `/ui`（多 Tab：`Key 片段查询`、`API 测试`、`API Key 查询`）
 - 兼容保留 `/ui/key-search`（按 key 前缀/后缀片段匹配，结果仅展示脱敏 key）
 - 内置 `html_api_test` 同等能力：规则解析、LLM 解析、上游联通测试、Neko Token 查询/导出
 - 调试日志、错误日志、上游请求日志分文件输出
@@ -83,9 +83,10 @@ copy .env.example .env
 重点配置项：
 
 ```env
-APP_VERSION=0.1.1
+APP_VERSION=0.1.2
 DATABASE_URL=sqlite:///./data/newapi_credit_logger.db
 LOG_LEVEL=DEBUG
+DEFAULT_POLL_INTERVAL_SECONDS=300
 API_KEY_ENCRYPT_SECRET=change-me-in-production
 ADMIN_PASSWORD=change-me-admin-password
 ADMIN_SESSION_SECRET=change-me-admin-session-secret
@@ -113,9 +114,9 @@ uv run python "main.py"
 
 - API：`http://127.0.0.1:8000/api`
 - 普通用户首页：`http://127.0.0.1:8000/ui`
-- 前台监控列表：`http://127.0.0.1:8000/ui/sources`
 - 兼容入口（Key 查询）：`http://127.0.0.1:8000/ui/key-search`
 - 后台：`http://127.0.0.1:8000/admin`
+- 后台监控列表：`http://127.0.0.1:8000/admin/sources`
 
 ## 后台登录
 

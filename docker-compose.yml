@@ -9,13 +9,13 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL:-sqlite:///./data/newapi_credit_logger.db}
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:${APP_PORT:-8000}"
     volumes:
       - ./logs:/app/logs
       - ./data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health').read()"]
+      test: ["CMD", "python", "-c", "import os, urllib.request; port=os.getenv('APP_PORT','8000'); urllib.request.urlopen('http://127.0.0.1:%s/api/health' % port).read()"]
       interval: 30s
       timeout: 5s
       retries: 3

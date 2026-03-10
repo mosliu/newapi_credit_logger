@@ -2,12 +2,13 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.services.admin_auth_service import is_admin_authenticated
 from app.services.query_service import (
     build_chart_points,
     get_source_detail,
@@ -57,7 +58,10 @@ async def source_dashboard(
     request: Request,
     key_owner: str | None = Query(default=None),
     db: Session = Depends(get_db),
-) -> HTMLResponse:
+) -> Response:
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
+
     rows = list_source_dashboard(db, key_owner=key_owner)
     return templates.TemplateResponse(
         request=request,
@@ -73,7 +77,10 @@ async def source_detail(
     start_at: datetime | None = Query(default=None),
     end_at: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
-) -> HTMLResponse:
+) -> Response:
+    if not is_admin_authenticated(request):
+        return RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
+
     source, records = get_source_detail(db, source_id, start_at=start_at, end_at=end_at)
     if source is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")

@@ -9,6 +9,7 @@ from app.admin.router import router as admin_router
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
+from app.db.schema import ensure_database_schema
 from app.services.admin_auth_service import is_admin_authenticated
 from app.tasks.scheduler_service import source_scheduler_service
 from app.ui.router import router as ui_router
@@ -21,6 +22,7 @@ logger = get_logger("app")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Application startup")
+    ensure_database_schema()
     app.state.http_client = httpx.AsyncClient()
     source_scheduler_service.start()
     yield

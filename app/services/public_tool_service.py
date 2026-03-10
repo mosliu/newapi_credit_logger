@@ -6,6 +6,7 @@ import time
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
 
@@ -13,6 +14,7 @@ import httpx
 
 from app.core.config import Settings
 from app.core.logging import get_logger
+from app.services.providers.utils import extract_amount_breakdown, extract_payload
 
 CHANNELS = {"openai_chat", "openai_responses", "gemini", "claude"}
 CLI_PROFILES = {"default", "cc", "codex", "geminicli"}
@@ -702,32 +704,57 @@ async def _get_json(
     *,
     client: httpx.AsyncClient,
     url: str,
+    url_for_log: str | None = None,
     headers: dict[str, str],
     timeout_sec: float,
     log_preview_len: int,
     log_tag: str,
 ) -> Any:
     started = time.perf_counter()
+    log_url = url_for_log or url
     masked_headers = {
         key: (mask_key(value) if key.lower() == "authorization" else value)
         for key, value in headers.items()
     }
-    upstream_logger.info("[{}_REQ] url={} headers={}", log_tag, url, safe_json_dumps(masked_headers))
+    upstream_logger.info(
+        "[{}_REQ] url={} headers={}",
+        log_tag,
+        log_url,
+        safe_json_dumps(masked_headers),
+    )
 
     timeout = httpx.Timeout(connect=5.0, read=timeout_sec, write=10.0, pool=5.0)
     try:
         response = await client.get(url, headers=headers, timeout=timeout)
     except httpx.TimeoutException as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
-        upstream_logger.warning("[{}_TIMEOUT] elapsed_ms={} url={} error={}", log_tag, elapsed_ms, url, exc)
+        upstream_logger.warning(
+            "[{}_TIMEOUT] elapsed_ms={} url={} error={}",
+            log_tag,
+            elapsed_ms,
+            log_url,
+            exc,
+        )
         raise TimeoutError(f"请求超时（{elapsed_ms}ms）: {exc}") from exc
     except httpx.ConnectError as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
-        upstream_logger.warning("[{}_CONNECT_ERR] elapsed_ms={} url={} error={}", log_tag, elapsed_ms, url, exc)
+        upstream_logger.warning(
+            "[{}_CONNECT_ERR] elapsed_ms={} url={} error={}",
+            log_tag,
+            elapsed_ms,
+            log_url,
+            exc,
+        )
         raise ConnectionError(f"无法连接目标站点: {exc}") from exc
     except httpx.HTTPError as exc:
         elapsed_ms = int((time.perf_counter() - started) * 1000)
-        upstream_logger.exception("[{}_HTTP_ERR] elapsed_ms={} url={} error={}", log_tag, elapsed_ms, url, exc)
+        upstream_logger.exception(
+            "[{}_HTTP_ERR] elapsed_ms={} url={} error={}",
+            log_tag,
+            elapsed_ms,
+            log_url,
+            exc,
+        )
         raise RuntimeError(f"请求失败: {exc}") from exc
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
@@ -747,12 +774,46 @@ async def _get_json(
         raise RuntimeError("返回内容不是合法 JSON") from exc
 
 
+def _decimal_to_float(value: Decimal | None) -> float:
+    if value is None:
+        return 0.0
+    try:
+        return float(value)
+    except Exception:
+        return 0.0
+
+
+def _extract_user_self_usage_info(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise RuntimeError("self 返回不是 JSON 对象")
+
+    success = _is_success_flag(payload.get("success")) or _is_success_flag(payload.get("code"))
+    data = extract_payload(payload)
+    if isinstance(data, dict) and not success:
+        success = True
+    if not success or not isinstance(data, dict):
+        raise RuntimeError(_pick_message(payload, "查询令牌信息失败"))
+
+    limit_amount, usage_amount, balance, currency = extract_amount_breakdown(data)
+    return {
+        "tokenName": data.get("name") or data.get("username") or "",
+        "unlimitedQuota": bool(data.get("unlimited_quota", data.get("unlimitedQuota", False))),
+        "totalGranted": _decimal_to_float(limit_amount),
+        "totalUsed": _decimal_to_float(usage_amount),
+        "totalAvailable": _decimal_to_float(balance),
+        "expiresAt": -1,
+        "expiresAtText": "未知",
+        "currency": currency or "",
+    }
+
+
 async def query_neko_token(
     *,
     client: httpx.AsyncClient,
     config: NekoToolConfig,
     token: str,
     base_url: str,
+    variant: str,
     fetch_balance: bool | None,
     fetch_detail: bool | None,
     timeout_sec: float | None,
@@ -761,6 +822,9 @@ async def query_neko_token(
 ) -> dict[str, Any]:
     token_value = validate_token_or_raise(token)
     resolved_base_url, base_url_source = resolve_base_url_or_raise(config, base_url)
+    variant_value = (variant or "newapi").strip().lower()
+    if variant_value not in {"newapi", "newapi_legacy"}:
+        variant_value = "newapi"
 
     need_balance = config.show_balance if fetch_balance is None else bool(fetch_balance)
     need_detail = config.show_detail if fetch_detail is None else bool(fetch_detail)
@@ -778,6 +842,7 @@ async def query_neko_token(
         "baseUrl": resolved_base_url,
         "baseUrlSource": base_url_source,
         "tokenMasked": mask_key(token_value),
+        "variant": variant_value,
         "fetchBalance": need_balance,
         "fetchDetail": need_detail,
         "tokenValid": False,
@@ -795,32 +860,99 @@ async def query_neko_token(
     }
 
     if need_balance:
-        usage_url = f"{resolved_base_url}/api/usage/token/"
         try:
-            usage_payload = await _get_json(
-                client=client,
-                url=usage_url,
-                headers=headers,
-                timeout_sec=timeout,
-                log_preview_len=log_preview_len,
-                log_tag="NEKO_USAGE",
-            )
-            result["tokenInfo"] = _extract_usage_info(usage_payload)
+            if variant_value == "newapi_legacy":
+                user_self_url = f"{resolved_base_url}/api/user/self"
+                user_self_payload = await _get_json(
+                    client=client,
+                    url=user_self_url,
+                    headers=headers,
+                    timeout_sec=timeout,
+                    log_preview_len=log_preview_len,
+                    log_tag="NEKO_SELF",
+                )
+                result["tokenInfo"] = _extract_user_self_usage_info(user_self_payload)
+            else:
+                usage_url = f"{resolved_base_url}/api/usage/token"
+                try:
+                    usage_payload = await _get_json(
+                        client=client,
+                        url=usage_url,
+                        headers=headers,
+                        timeout_sec=timeout,
+                        log_preview_len=log_preview_len,
+                        log_tag="NEKO_USAGE",
+                    )
+                except RuntimeError as exc:
+                    message = str(exc)
+                    if "HTTP 404" in message or "HTTP 405" in message:
+                        usage_payload = await _get_json(
+                            client=client,
+                            url=f"{resolved_base_url}/api/usage/token/",
+                            headers=headers,
+                            timeout_sec=timeout,
+                            log_preview_len=log_preview_len,
+                            log_tag="NEKO_USAGE",
+                        )
+                    else:
+                        raise
+                result["tokenInfo"] = _extract_usage_info(usage_payload)
             result["tokenValid"] = True
         except Exception as exc:  # noqa: BLE001
             result["errors"].append(f"令牌信息查询失败: {exc}")
 
     if need_detail:
-        logs_url = f"{resolved_base_url}/api/log/token"
         try:
-            logs_payload = await _get_json(
-                client=client,
-                url=logs_url,
-                headers=headers,
-                timeout_sec=timeout,
-                log_preview_len=log_preview_len,
-                log_tag="NEKO_LOG",
-            )
+            if variant_value == "newapi":
+                logs_url = f"{resolved_base_url}/api/log/token?key={quote(token_value)}"
+                logs_masked_url = f"{resolved_base_url}/api/log/token?key={mask_key(token_value)}"
+                logs_headers = {"Accept": "application/json"}
+                logs_headers.update(build_cli_headers(profile))
+                try:
+                    logs_payload = await _get_json(
+                        client=client,
+                        url=logs_url,
+                        url_for_log=logs_masked_url,
+                        headers=logs_headers,
+                        timeout_sec=timeout,
+                        log_preview_len=log_preview_len,
+                        log_tag="NEKO_LOG",
+                    )
+                except Exception:
+                    logs_payload = await _get_json(
+                        client=client,
+                        url=f"{resolved_base_url}/api/log/token",
+                        headers=headers,
+                        timeout_sec=timeout,
+                        log_preview_len=log_preview_len,
+                        log_tag="NEKO_LOG",
+                    )
+            else:
+                logs_url = f"{resolved_base_url}/api/log/token"
+                try:
+                    logs_payload = await _get_json(
+                        client=client,
+                        url=logs_url,
+                        headers=headers,
+                        timeout_sec=timeout,
+                        log_preview_len=log_preview_len,
+                        log_tag="NEKO_LOG",
+                    )
+                except Exception:
+                    logs_url = f"{resolved_base_url}/api/log/token?key={quote(token_value)}"
+                    logs_masked_url = f"{resolved_base_url}/api/log/token?key={mask_key(token_value)}"
+                    logs_headers = {"Accept": "application/json"}
+                    logs_headers.update(build_cli_headers(profile))
+                    logs_payload = await _get_json(
+                        client=client,
+                        url=logs_url,
+                        url_for_log=logs_masked_url,
+                        headers=logs_headers,
+                        timeout_sec=timeout,
+                        log_preview_len=log_preview_len,
+                        log_tag="NEKO_LOG",
+                    )
+
             logs = _extract_logs(logs_payload)
             result["logs"] = logs
             result["stats"] = _build_stats(logs)

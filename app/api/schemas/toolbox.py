@@ -20,6 +20,7 @@ class ApiTestRequest(BaseModel):
 class NekoQueryRequest(BaseModel):
     token: str = Field(min_length=1)
     base_url: str = ""
+    variant: Literal["newapi", "newapi_legacy"] = "newapi"
     fetch_balance: bool | None = None
     fetch_detail: bool | None = None
     timeout_sec: float | None = Field(default=None, ge=3, le=120)

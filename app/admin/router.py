@@ -100,7 +100,7 @@ def _default_form_data() -> dict:
         "fee_amount": "",
         "fee_currency": "",
         "remark": "",
-        "interval_seconds": "60",
+        "interval_seconds": str(get_settings().default_poll_interval_seconds),
         "timeout_seconds": "20",
         "enabled": True,
     }
@@ -212,7 +212,9 @@ async def admin_source_create(request: Request, db: Session = Depends(get_db)):
         "fee_amount": _as_optional(str(form.get("fee_amount", ""))),
         "fee_currency": _as_optional(str(form.get("fee_currency", ""))),
         "remark": _as_optional(str(form.get("remark", ""))),
-        "interval_seconds": str(form.get("interval_seconds", "60")),
+        "interval_seconds": str(
+            form.get("interval_seconds", str(get_settings().default_poll_interval_seconds))
+        ),
         "timeout_seconds": str(form.get("timeout_seconds", "20")),
         "enabled": bool(form.get("enabled")),
     }
@@ -307,7 +309,9 @@ async def admin_source_edit(source_id: int, request: Request, db: Session = Depe
         "fee_amount": _as_optional(str(form.get("fee_amount", ""))),
         "fee_currency": _as_optional(str(form.get("fee_currency", ""))),
         "remark": _as_optional(str(form.get("remark", ""))),
-        "interval_seconds": str(form.get("interval_seconds", "60")),
+        "interval_seconds": str(
+            form.get("interval_seconds", str(get_settings().default_poll_interval_seconds))
+        ),
         "timeout_seconds": str(form.get("timeout_seconds", "20")),
         "enabled": bool(form.get("enabled")),
     }

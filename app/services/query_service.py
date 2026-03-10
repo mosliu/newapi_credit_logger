@@ -53,8 +53,8 @@ def search_sources_by_key_fragment(db: Session, key_fragment: str) -> tuple[list
     fragment = key_fragment.strip()
     if not fragment:
         return [], None
-    if len(fragment) < 6:
-        return [], "请输入至少 6 位 key 片段（后缀 6 位或前缀 8 位更易匹配）。"
+    if len(fragment) < 12:
+        return [], "请输入至少 12 位 key 片段（前缀/后缀匹配更安全、更易定位）。"
 
     rows: list[dict] = []
     for source in db.query(ApiKeySource).order_by(ApiKeySource.id.desc()).all():
@@ -94,21 +94,19 @@ def search_sources_by_key_fragment(db: Session, key_fragment: str) -> tuple[list
 
 
 def _match_score(raw_api_key: str, fragment: str) -> int:
-    if len(fragment) >= 8 and raw_api_key.startswith(fragment):
+    if len(fragment) >= 12 and raw_api_key.startswith(fragment):
         return 300 + len(fragment)
-    if len(fragment) >= 6 and raw_api_key.endswith(fragment):
+    if len(fragment) >= 12 and raw_api_key.endswith(fragment):
         return 200 + len(fragment)
-    if len(fragment) >= 8 and fragment in raw_api_key:
+    if len(fragment) >= 12 and fragment in raw_api_key:
         return 100 + len(fragment)
-    if len(fragment) >= 6 and fragment in raw_api_key:
-        return 50 + len(fragment)
     return 0
 
 
 def _match_hint(raw_api_key: str, fragment: str) -> str:
-    if len(fragment) >= 8 and raw_api_key.startswith(fragment):
+    if len(fragment) >= 12 and raw_api_key.startswith(fragment):
         return "前缀匹配"
-    if len(fragment) >= 6 and raw_api_key.endswith(fragment):
+    if len(fragment) >= 12 and raw_api_key.endswith(fragment):
         return "后缀匹配"
     if fragment in raw_api_key:
         return "片段包含匹配"

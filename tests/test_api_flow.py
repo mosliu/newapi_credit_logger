@@ -121,7 +121,7 @@ def test_public_key_fragment_search() -> None:
         )
         db.commit()
 
-    by_prefix = client.get("/ui/key-search", params={"key_fragment": "sk-prefix"})
+    by_prefix = client.get("/ui/key-search", params={"key_fragment": "sk-prefix-search"})
     assert by_prefix.status_code == 200
     assert "search-source-1" in by_prefix.text
     assert "前缀匹配" in by_prefix.text
@@ -132,14 +132,14 @@ def test_public_key_fragment_search() -> None:
     assert "67.3" in by_prefix.text
     assert "33.2" in by_prefix.text
 
-    by_suffix = client.get("/ui/key-search", params={"key_fragment": "123456"})
+    by_suffix = client.get("/ui/key-search", params={"key_fragment": "abcdef123456"})
     assert by_suffix.status_code == 200
     assert "search-source-1" in by_suffix.text
     assert "后缀匹配" in by_suffix.text
 
     too_short = client.get("/ui/key-search", params={"key_fragment": "12345"})
     assert too_short.status_code == 200
-    assert "至少 6 位 key 片段" in too_short.text
+    assert "至少 12 位 key 片段" in too_short.text
 
 
 def test_public_home_and_tool_config() -> None:
@@ -148,11 +148,11 @@ def test_public_home_and_tool_config() -> None:
 
     home = client.get("/ui")
     assert home.status_code == 200
-    assert "普通用户查询首页" in home.text
+    assert "Key 查询（片段匹配）" in home.text
     assert "API 可用性测试工具" in home.text
     assert "API 测试" in home.text
-    assert "Neko 查询" in home.text
-    assert "v0.1.1" in home.text
+    assert "API Key 查询" in home.text
+    assert "v0.1.2" in home.text
 
     home_neko = client.get("/ui", params={"tab": "neko-query"})
     assert home_neko.status_code == 200

@@ -4,7 +4,12 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic import field_validator
 
+from app.core.config import get_settings
 from app.services.providers.catalog import is_supported_provider_type
+
+
+def _default_interval_seconds() -> int:
+    return get_settings().default_poll_interval_seconds
 
 
 class SourceBase(BaseModel):
@@ -18,7 +23,7 @@ class SourceBase(BaseModel):
     fee_amount: Decimal | None = Field(default=None, ge=0, max_digits=20, decimal_places=2)
     fee_currency: str | None = Field(default=None, max_length=20)
     remark: str | None = Field(default=None, max_length=500)
-    interval_seconds: int = Field(default=60, ge=10, le=86400)
+    interval_seconds: int = Field(default_factory=_default_interval_seconds, ge=10, le=86400)
     timeout_seconds: int = Field(default=20, ge=1, le=120)
     enabled: bool = True
 

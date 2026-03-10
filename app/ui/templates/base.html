@@ -259,9 +259,9 @@
         </div>
         <div class="toolbar">
             <span class="version-chip">v{{ app_version }}</span>
-            <a class="btn" href="/ui">普通用户首页</a>
-            <a class="btn" href="/ui/sources">监控列表</a>
-            <a class="btn" href="/ui/key-search">Key片段查询</a>
+            <a class="btn" href="/ui?tab=key-search">Key 查询</a>
+            <a class="btn" href="/ui?tab=api-test">API 测试</a>
+            <a class="btn" href="/ui?tab=neko-query">API Key 查询</a>
         </div>
     </header>
     {% block content %}{% endblock %}
