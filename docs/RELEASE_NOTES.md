@@ -2,7 +2,7 @@
 
 本项目采用 `MAJOR.MINOR.PATCH` 语义化版本号。
 
-## v0.1.1 - 2026-03-09
+## v0.1.1 - 2026-03-10
 
 ### Added
 
@@ -29,6 +29,7 @@
 
 - 新增发布日志文档 `docs/RELEASE_NOTES.md`。
 - 更新 `README.md`，补充 `APP_VERSION` 配置说明与发布日志文档入口。
+- 新增数据库初始化文档 `docs/DATABASE_SETUP.md`，并提供 `docs/sql/mysql_init.sql`、`docs/sql/postgresql_init.sql`（由 Alembic 离线 `--sql` 生成）。
 
 ### Verification
 

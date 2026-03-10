@@ -237,6 +237,7 @@ python -m compileall "app"
 ## 文档
 
 - 开发计划：`docs/DEVELOPMENT_PLAN.md`
+- 数据库初始化：`docs/DATABASE_SETUP.md`
 - 发布日志：`docs/RELEASE_NOTES.md`
 - Provider 兼容说明：`docs/PROVIDER_API_COMPATIBILITY.md`
 - Docker 部署：`docs/DOCKER_DEPLOYMENT.md`
