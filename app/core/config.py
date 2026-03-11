@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     log_level: str = "DEBUG"
     log_rotation: str = "00:00"
     log_retention: str = "30 days"
+    log_preview_len: int = 220
 
     default_poll_interval_seconds: int = 300
     default_request_timeout_seconds: int = 20

@@ -12,6 +12,13 @@
 - `API Key 查询` 增加 NewAPI 新版/老版选择，并按版本走不同接口查询逻辑。
 - 移除普通用户首页重复的分段标签栏，改为通过顶栏按钮切换功能。
 
+### Fixed
+
+- 修复 `API Key 查询` 接口 `/api/neko/query` 报 500（Settings 缺少 `log_preview_len`）的问题，并补齐 `LOG_PREVIEW_LEN` 配置项（控制上游调试日志预览截断长度）。
+- 优化 `API Key 查询` 上游返回非 JSON（如 WAF/JS Challenge HTML）时的报错提示与日志信息（增加 `content-type`），便于快速定位站点防护拦截问题。
+- 修正 `API Key 查询` 中 “NewAPI 老版” 的实现：余额信息改为使用 `/v1/dashboard/billing/subscription` + `/v1/dashboard/billing/usage`（并兼容 `/dashboard/...`），避免错误走到 `/api/user/self`。
+- 关闭 `API Key 查询` 中 `NewAPI 老版` 的调用日志查询：旧版无调用日志接口，前端不再发起 `/api/log/token` 请求。
+
 ### Verification
 
 - 自动化测试：`uv run pytest` 通过。

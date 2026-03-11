@@ -5,7 +5,7 @@ import re
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qs, quote, urlparse
@@ -14,7 +14,13 @@ import httpx
 
 from app.core.config import Settings
 from app.core.logging import get_logger
-from app.services.providers.utils import extract_amount_breakdown, extract_payload
+from app.services.providers.utils import (
+    extract_amount_breakdown,
+    extract_payload,
+    extract_subscription_limit,
+    extract_usage_total,
+    quantize_amount,
+)
 
 CHANNELS = {"openai_chat", "openai_responses", "gemini", "claude"}
 CLI_PROFILES = {"default", "cc", "codex", "geminicli"}
@@ -400,6 +406,119 @@ def build_endpoint(base_url: str, path: str) -> str:
     return f"{base}{fixed}"
 
 
+def drop_trailing_v1(base_url: str) -> str:
+    """Some users may paste a Base URL ending with /v1.
+
+    For NewAPI-style endpoints under /api/* we need the site root.
+    For OpenAI-style endpoints under /v1/* we will add /v1 via build_endpoint().
+    """
+
+    base = normalize_base_url(base_url)
+    if base.lower().endswith("/v1"):
+        return base[:-3]
+    return base
+
+
+def _dedupe_preserve_order(items: list[str]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        if item in seen:
+            continue
+        seen.add(item)
+        result.append(item)
+    return result
+
+
+async def _get_json_first_supported(
+    *,
+    client: httpx.AsyncClient,
+    urls: list[str],
+    headers: dict[str, str],
+    timeout_sec: float,
+    log_preview_len: int,
+    log_tag: str,
+    skip_http_statuses: set[int] | None = None,
+) -> Any:
+    """Try candidate URLs in order.
+
+    `skip_http_statuses` (e.g. {404, 405}) will be treated as "not supported" and continue.
+    """
+
+    skip = skip_http_statuses or set()
+    last_exc: Exception | None = None
+    for url in urls:
+        try:
+            return await _get_json(
+                client=client,
+                url=url,
+                headers=headers,
+                timeout_sec=timeout_sec,
+                log_preview_len=log_preview_len,
+                log_tag=log_tag,
+            )
+        except RuntimeError as exc:
+            last_exc = exc
+            message = str(exc)
+            # _get_json formats status errors as: "HTTP {code} ..."
+            matched = re.search(r"HTTP\s+(\d+)\b", message)
+            if matched:
+                status = int(matched.group(1))
+                if status in skip:
+                    continue
+            raise
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError("no candidate url")
+
+
+def _extract_billing_usage_info(
+    *,
+    subscription_json: Any,
+    usage_json: Any,
+) -> dict[str, Any]:
+    if not isinstance(subscription_json, dict):
+        raise RuntimeError("subscription 返回不是 JSON 对象")
+    if not isinstance(usage_json, dict):
+        raise RuntimeError("usage 返回不是 JSON 对象")
+
+    subscription_payload = extract_payload(subscription_json)
+    usage_payload = extract_payload(usage_json)
+
+    direct_limit_amount, direct_usage_amount, direct_balance, direct_currency = extract_amount_breakdown(
+        subscription_payload
+    )
+    if direct_balance is not None:
+        return {
+            "tokenName": "",
+            "unlimitedQuota": bool(subscription_payload.get("unlimited_quota", False)),
+            "totalGranted": _decimal_to_float(direct_limit_amount),
+            "totalUsed": _decimal_to_float(direct_usage_amount),
+            "totalAvailable": _decimal_to_float(direct_balance),
+            "expiresAt": -1,
+            "expiresAtText": "未知",
+            "currency": direct_currency or "",
+        }
+
+    limit_value, currency = extract_subscription_limit(subscription_payload)
+    usage_total_fen = extract_usage_total(usage_payload)
+    if limit_value is None or usage_total_fen is None:
+        raise RuntimeError("无法从 /v1/dashboard/billing 提取额度信息")
+
+    usage_amount = quantize_amount(usage_total_fen / Decimal("100"))
+    balance = quantize_amount(limit_value - usage_amount)
+    return {
+        "tokenName": "",
+        "unlimitedQuota": False,
+        "totalGranted": _decimal_to_float(limit_value),
+        "totalUsed": _decimal_to_float(usage_amount),
+        "totalAvailable": _decimal_to_float(balance),
+        "expiresAt": -1,
+        "expiresAtText": "未知",
+        "currency": currency or "",
+    }
+
+
 def extract_text_from_response(channel: str, response: Any) -> str:
     if isinstance(response, str):
         return response
@@ -759,11 +878,13 @@ async def _get_json(
 
     elapsed_ms = int((time.perf_counter() - started) * 1000)
     text = response.text
+    content_type = response.headers.get("content-type", "")
     upstream_logger.info(
-        "[{}_RES] status={} elapsed_ms={} body_preview={}",
+        "[{}_RES] status={} elapsed_ms={} content_type={} body_preview={}",
         log_tag,
         response.status_code,
         elapsed_ms,
+        content_type,
         truncate_text(text, log_preview_len),
     )
     if response.status_code >= 400:
@@ -771,7 +892,13 @@ async def _get_json(
     try:
         return response.json()
     except Exception as exc:
-        raise RuntimeError("返回内容不是合法 JSON") from exc
+        lower_preview = (text or "").lstrip()[:200].lower()
+        hint = ""
+        if lower_preview.startswith("<!doctype html") or lower_preview.startswith("<html") or "var arg1=" in lower_preview:
+            hint = "（上游返回 HTML，疑似开启了 JS 防护/反爬或被反向代理拦截；请检查 base_url 是否为 API 域名，或关闭/放行 /api 路径的防护，或将本服务 IP 加白）"
+        raise RuntimeError(
+            f"返回内容不是合法 JSON{hint} content_type={content_type or 'unknown'}"
+        ) from exc
 
 
 def _decimal_to_float(value: Decimal | None) -> float:
@@ -822,12 +949,19 @@ async def query_neko_token(
 ) -> dict[str, Any]:
     token_value = validate_token_or_raise(token)
     resolved_base_url, base_url_source = resolve_base_url_or_raise(config, base_url)
+    api_base_url = drop_trailing_v1(resolved_base_url)
     variant_value = (variant or "newapi").strip().lower()
     if variant_value not in {"newapi", "newapi_legacy"}:
         variant_value = "newapi"
 
     need_balance = config.show_balance if fetch_balance is None else bool(fetch_balance)
-    need_detail = config.show_detail if fetch_detail is None else bool(fetch_detail)
+    requested_detail = config.show_detail if fetch_detail is None else bool(fetch_detail)
+    need_detail = requested_detail
+    if variant_value == "newapi_legacy":
+        # Legacy (dashboard billing) does not provide /api/log/token, so detail query is unsupported.
+        need_detail = False
+        if requested_detail and not need_balance:
+            raise ValueError("NewAPI 老版不支持调用日志查询，请启用「查询令牌信息」")
     if not (need_balance or need_detail):
         raise ValueError("请至少启用一个查询项（余额信息或调用明细）")
 
@@ -860,9 +994,81 @@ async def query_neko_token(
     }
 
     if need_balance:
-        try:
-            if variant_value == "newapi_legacy":
-                user_self_url = f"{resolved_base_url}/api/user/self"
+        if variant_value == "newapi_legacy":
+            subscription_urls = _dedupe_preserve_order(
+                [
+                    build_endpoint(api_base_url, "/v1/dashboard/billing/subscription"),
+                    build_endpoint(api_base_url, "/dashboard/billing/subscription"),
+                ]
+            )
+            usage_urls = _dedupe_preserve_order(
+                [
+                    build_endpoint(api_base_url, "/v1/dashboard/billing/usage"),
+                    build_endpoint(api_base_url, "/dashboard/billing/usage"),
+                ]
+            )
+
+            # Some implementations require a date range query.
+            today = datetime.now(timezone.utc).date()
+            start_date = (today - timedelta(days=30)).isoformat()
+            end_date = today.isoformat()
+            usage_urls.extend(
+                _dedupe_preserve_order(
+                    [
+                        build_endpoint(
+                            api_base_url,
+                            f"/v1/dashboard/billing/usage?start_date={start_date}&end_date={end_date}",
+                        ),
+                        build_endpoint(
+                            api_base_url,
+                            f"/dashboard/billing/usage?start_date={start_date}&end_date={end_date}",
+                        ),
+                    ]
+                )
+            )
+            usage_urls = _dedupe_preserve_order(usage_urls)
+
+            subscription_json: Any | None = None
+            usage_json: Any | None = None
+            try:
+                subscription_json = await _get_json_first_supported(
+                    client=client,
+                    urls=subscription_urls,
+                    headers=headers,
+                    timeout_sec=timeout,
+                    log_preview_len=log_preview_len,
+                    log_tag="NEKO_SUB",
+                    skip_http_statuses={404, 405},
+                )
+            except Exception as exc:  # noqa: BLE001
+                result["errors"].append(f"令牌信息查询失败(subscription): {exc}")
+
+            # Even if subscription failed (e.g. 401), still try usage for debugging/support info.
+            try:
+                usage_json = await _get_json_first_supported(
+                    client=client,
+                    urls=usage_urls,
+                    headers=headers,
+                    timeout_sec=timeout,
+                    log_preview_len=log_preview_len,
+                    log_tag="NEKO_USAGE",
+                    skip_http_statuses={400, 404, 405},
+                )
+            except Exception as exc:  # noqa: BLE001
+                result["errors"].append(f"令牌信息查询失败(usage): {exc}")
+
+            if subscription_json is not None and usage_json is not None:
+                try:
+                    result["tokenInfo"] = _extract_billing_usage_info(
+                        subscription_json=subscription_json,
+                        usage_json=usage_json,
+                    )
+                    result["tokenValid"] = True
+                except Exception as exc:  # noqa: BLE001
+                    result["errors"].append(f"令牌信息解析失败: {exc}")
+        else:
+            try:
+                user_self_url = f"{api_base_url}/api/user/self"
                 user_self_payload = await _get_json(
                     client=client,
                     url=user_self_url,
@@ -872,86 +1078,36 @@ async def query_neko_token(
                     log_tag="NEKO_SELF",
                 )
                 result["tokenInfo"] = _extract_user_self_usage_info(user_self_payload)
-            else:
-                usage_url = f"{resolved_base_url}/api/usage/token"
-                try:
-                    usage_payload = await _get_json(
-                        client=client,
-                        url=usage_url,
-                        headers=headers,
-                        timeout_sec=timeout,
-                        log_preview_len=log_preview_len,
-                        log_tag="NEKO_USAGE",
-                    )
-                except RuntimeError as exc:
-                    message = str(exc)
-                    if "HTTP 404" in message or "HTTP 405" in message:
-                        usage_payload = await _get_json(
-                            client=client,
-                            url=f"{resolved_base_url}/api/usage/token/",
-                            headers=headers,
-                            timeout_sec=timeout,
-                            log_preview_len=log_preview_len,
-                            log_tag="NEKO_USAGE",
-                        )
-                    else:
-                        raise
-                result["tokenInfo"] = _extract_usage_info(usage_payload)
-            result["tokenValid"] = True
-        except Exception as exc:  # noqa: BLE001
-            result["errors"].append(f"令牌信息查询失败: {exc}")
+                result["tokenValid"] = True
+            except Exception as exc:  # noqa: BLE001
+                result["errors"].append(f"令牌信息查询失败: {exc}")
 
     if need_detail:
         try:
-            if variant_value == "newapi":
-                logs_url = f"{resolved_base_url}/api/log/token?key={quote(token_value)}"
-                logs_masked_url = f"{resolved_base_url}/api/log/token?key={mask_key(token_value)}"
+            logs_url = f"{api_base_url}/api/log/token"
+            try:
+                logs_payload = await _get_json(
+                    client=client,
+                    url=logs_url,
+                    headers=headers,
+                    timeout_sec=timeout,
+                    log_preview_len=log_preview_len,
+                    log_tag="NEKO_LOG",
+                )
+            except Exception:
+                logs_url = f"{api_base_url}/api/log/token?key={quote(token_value)}"
+                logs_masked_url = f"{api_base_url}/api/log/token?key={mask_key(token_value)}"
                 logs_headers = {"Accept": "application/json"}
                 logs_headers.update(build_cli_headers(profile))
-                try:
-                    logs_payload = await _get_json(
-                        client=client,
-                        url=logs_url,
-                        url_for_log=logs_masked_url,
-                        headers=logs_headers,
-                        timeout_sec=timeout,
-                        log_preview_len=log_preview_len,
-                        log_tag="NEKO_LOG",
-                    )
-                except Exception:
-                    logs_payload = await _get_json(
-                        client=client,
-                        url=f"{resolved_base_url}/api/log/token",
-                        headers=headers,
-                        timeout_sec=timeout,
-                        log_preview_len=log_preview_len,
-                        log_tag="NEKO_LOG",
-                    )
-            else:
-                logs_url = f"{resolved_base_url}/api/log/token"
-                try:
-                    logs_payload = await _get_json(
-                        client=client,
-                        url=logs_url,
-                        headers=headers,
-                        timeout_sec=timeout,
-                        log_preview_len=log_preview_len,
-                        log_tag="NEKO_LOG",
-                    )
-                except Exception:
-                    logs_url = f"{resolved_base_url}/api/log/token?key={quote(token_value)}"
-                    logs_masked_url = f"{resolved_base_url}/api/log/token?key={mask_key(token_value)}"
-                    logs_headers = {"Accept": "application/json"}
-                    logs_headers.update(build_cli_headers(profile))
-                    logs_payload = await _get_json(
-                        client=client,
-                        url=logs_url,
-                        url_for_log=logs_masked_url,
-                        headers=logs_headers,
-                        timeout_sec=timeout,
-                        log_preview_len=log_preview_len,
-                        log_tag="NEKO_LOG",
-                    )
+                logs_payload = await _get_json(
+                    client=client,
+                    url=logs_url,
+                    url_for_log=logs_masked_url,
+                    headers=logs_headers,
+                    timeout_sec=timeout,
+                    log_preview_len=log_preview_len,
+                    log_tag="NEKO_LOG",
+                )
 
             logs = _extract_logs(logs_payload)
             result["logs"] = logs
@@ -961,6 +1117,4 @@ async def query_neko_token(
             result["errors"].append(f"调用明细查询失败: {exc}")
 
     result["ok"] = result["tokenValid"] and not result["errors"]
-    if not result["tokenValid"]:
-        raise RuntimeError("；".join(result["errors"]) or "查询失败，请检查 token 与 base_url")
     return result

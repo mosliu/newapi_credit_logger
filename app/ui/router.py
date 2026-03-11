@@ -25,7 +25,7 @@ templates.env.globals["app_version"] = get_settings().app_version
 async def home(
     request: Request,
     key_fragment: str | None = Query(default=None),
-    tab: str | None = Query(default="key-search"),
+    tab: str | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     rows: list[dict] = []
@@ -33,13 +33,15 @@ async def home(
     if key_fragment:
         rows, error = search_sources_by_key_fragment(db, key_fragment=key_fragment)
     tab_value = (tab or "").strip().lower()
-    if tab_value == "api-tools":
+    if not tab_value:
+        active_tab = "key-search" if key_fragment else "neko-query"
+    elif tab_value == "api-tools":
         # Backward compatible with old tab param.
         active_tab = "api-test"
     elif tab_value in {"key-search", "api-test", "neko-query"}:
         active_tab = tab_value
     else:
-        active_tab = "key-search"
+        active_tab = "key-search" if key_fragment else "neko-query"
 
     return templates.TemplateResponse(
         request=request,

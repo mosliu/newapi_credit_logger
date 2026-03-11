@@ -2,6 +2,9 @@
 {% block title %}普通用户首页{% endblock %}
 {% block head %}
 <style>
+    .grid-split {
+        grid-template-columns: 1fr 220px;
+    }
     .home-tab-panel {
         display: none;
     }
@@ -189,7 +192,7 @@
 {% block content %}
 <section id="homeKeySearch" class="home-tab-panel {% if active_tab == 'key-search' %}active{% endif %}">
     <section class="panel reveal">
-        <h2>Key 查询（片段匹配）</h2>
+        <h2>登记Key查询（片段匹配）</h2>
         {% if error %}
             <div class="bad" style="margin-bottom:10px;">{{ error }}</div>
         {% endif %}
@@ -314,12 +317,12 @@
     <section>
         <section class="panel reveal">
             <p id="nekoConfigInfo" class="muted">等待加载配置...</p>
-            <div class="grid" style="margin-top:10px;">
-                <div class="field full">
+            <div class="grid grid-split" style="margin-top:10px;">
+                <div class="field">
                     <label for="nekoBaseUrl">NewAPI 地址（Base URL）</label>
                     <input id="nekoBaseUrl" type="text" placeholder="https://newapi.example.com">
                 </div>
-                <div class="field">
+                <div class="field" style="max-width:220px;">
                     <label for="nekoVariant">NewAPI 版本</label>
                     <select id="nekoVariant">
                         <option value="newapi" selected>NewAPI 新版</option>
@@ -327,17 +330,17 @@
                     </select>
                 </div>
                 <div class="field">
+                    <label for="nekoToken">API Key / Token</label>
+                    <input id="nekoToken" type="password" placeholder="sk-xxxxxxxxxxxx">
+                </div>
+                <div class="field" style="max-width:220px;">
                     <label for="nekoTimeout">超时（秒）</label>
                     <input id="nekoTimeout" type="number" min="3" max="120" step="1" value="30">
                 </div>
                 <div class="field full">
-                    <label for="nekoToken">API Key / Token</label>
-                    <input id="nekoToken" type="password" placeholder="sk-xxxxxxxxxxxx">
-                </div>
-                <div class="field full">
                     <div class="checks">
                         <label class="check-item"><input id="nekoFetchBalance" type="checkbox" checked> 查询令牌信息</label>
-                        <label class="check-item"><input id="nekoFetchDetail" type="checkbox" checked> 查询调用日志</label>
+                        <label class="check-item"><input id="nekoFetchDetail" type="checkbox" checked> 查询调用日志（仅新版）</label>
                     </div>
                 </div>
             </div>
@@ -432,6 +435,8 @@ const state = {
   nekoLastResult: null,
   nekoLogs: []
 };
+
+let nekoDetailWanted = true;
 
 const el = {
   rawInput:         document.getElementById("rawInput"),
@@ -622,6 +627,7 @@ function applyNekoConfig(nekoCfg) {
   runtime.neko.enabled = asBool(nekoCfg.enabled, true);
   runtime.neko.showBalance = asBool(nekoCfg.showBalance, true);
   runtime.neko.showDetail = asBool(nekoCfg.showDetail, true);
+  nekoDetailWanted = runtime.neko.showDetail;
 
   const mapped = (nekoCfg.baseUrls && typeof nekoCfg.baseUrls === "object") ? nekoCfg.baseUrls : {};
   let defaultBase = String(nekoCfg.defaultBaseUrl || "").trim();
@@ -648,6 +654,7 @@ function applyNekoConfig(nekoCfg) {
   el.nekoFetchDetail.checked = runtime.neko.showDetail;
   el.nekoFetchBalance.disabled = !runtime.neko.showBalance;
   el.nekoFetchDetail.disabled = !runtime.neko.showDetail;
+  syncNekoVariantUi();
 
   const enabledFeatures = [
     runtime.neko.showBalance ? "令牌信息" : null,
@@ -665,6 +672,25 @@ function applyNekoConfig(nekoCfg) {
     el.nekoConfigInfo.textContent = `已加载默认地址（可改）：${runtime.neko.defaultBaseUrl}；可用功能：${enabledFeatures}`;
   } else {
     el.nekoConfigInfo.textContent = `请手动填写 NewAPI 地址；可用功能：${enabledFeatures}`;
+  }
+}
+
+function syncNekoVariantUi() {
+  if (!el.nekoVariant || !el.nekoFetchDetail) return;
+  const variant = String(el.nekoVariant.value || "newapi").trim().toLowerCase();
+  const isLegacy = variant === "newapi_legacy";
+
+  if (isLegacy) {
+    el.nekoFetchDetail.checked = false;
+    el.nekoFetchDetail.disabled = true;
+    return;
+  }
+
+  el.nekoFetchDetail.disabled = !runtime.neko.showDetail;
+  if (runtime.neko.showDetail) {
+    el.nekoFetchDetail.checked = !!nekoDetailWanted;
+  } else {
+    el.nekoFetchDetail.checked = false;
   }
 }
 
@@ -723,6 +749,18 @@ function fillForm(data, sourceLabel, note) {
 }
 
 el.channel.addEventListener("change", () => applyDefaults(false));
+
+if (el.nekoVariant) {
+  el.nekoVariant.addEventListener("change", () => {
+    syncNekoVariantUi();
+  });
+}
+
+if (el.nekoFetchDetail) {
+  el.nekoFetchDetail.addEventListener("change", () => {
+    nekoDetailWanted = !!el.nekoFetchDetail.checked;
+  });
+}
 
 el.fillDefaultBtn.addEventListener("click", () => {
   applyDefaults(true);
@@ -890,7 +928,7 @@ el.nekoQueryBtn.addEventListener(
     const variant = (el.nekoVariant && el.nekoVariant.value) ? el.nekoVariant.value : "newapi";
     const timeoutSec = Number(el.nekoTimeout.value || runtime.neko.timeoutSec || 30);
     const fetchBalance = !!el.nekoFetchBalance.checked;
-    const fetchDetail = !!el.nekoFetchDetail.checked;
+    const fetchDetail = variant === "newapi_legacy" ? false : !!el.nekoFetchDetail.checked;
 
     if (!baseUrl) {
       renderNekoMeta("请先填写 NewAPI Base URL。", false);

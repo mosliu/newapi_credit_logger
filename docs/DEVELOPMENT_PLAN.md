@@ -83,6 +83,10 @@
 - [x] 实现 `docker-compose.yml`（服务启动、数据库连接、日志卷挂载）。
 - [x] 编写镜像分发文档（版本标签规范、构建与发布命令、回滚说明）。
 - [x] 增强上游请求调试日志，默认日志级别调整为 `DEBUG`。
+- [x] 修复公共工具 `/api/neko/query` 运行时 500（Settings 缺少 `log_preview_len`），补齐 `LOG_PREVIEW_LEN` 配置并补充回归测试。
+- [x] 优化 `/api/neko/query` 上游返回非 JSON（如 WAF/JS Challenge HTML）时的排障信息：日志补充 `content-type`，并在错误信息中提示可能原因与处置建议。
+- [x] 修正 `/api/neko/query` 的 “NewAPI 老版” 分支：令牌信息查询改为使用 `/v1/dashboard/billing/subscription` + `/v1/dashboard/billing/usage`（兼容 `/dashboard/...`），并补充单测锁定请求 URL。
+- [x] 关闭 `/api/neko/query` 的 “NewAPI 老版” 调用日志查询：旧版无调用日志接口，前端强制禁用并不再发起 `/api/log/token` 请求。
 - [x] 补齐后台会话中间件缺失依赖 `itsdangerous`。
 - [x] 修复后台登录路由返回类型注解导致的 FastAPI 启动错误。
 - [x] 修复后台认证中间件先于 SessionMiddleware 执行导致的 500 错误。
@@ -155,6 +159,10 @@
 - 2026-03-09：新增发布日志文档 `docs/RELEASE_NOTES.md`，补充 `v0.1.1` 发布说明，并在 README 增加入口。
 - 2026-03-10：补充 MySQL/PostgreSQL 的“自动建表”说明文档，并提供 Alembic 离线生成的建表 SQL 文件，便于手工执行或审计。
 - 2026-03-10：调整默认采集周期为 5 分钟（`DEFAULT_POLL_INTERVAL_SECONDS=300`），普通用户 Key 片段查询匹配阈值提升为 12 位+，并收敛普通用户顶栏入口为 3 个功能按钮（Key/API/API Key）；同时为 API Key 查询增加 NewAPI 新版/老版选择并走不同查询逻辑。
+- 2026-03-10：修复 `/api/neko/query` 500（Settings 缺少 `log_preview_len`），补齐 `LOG_PREVIEW_LEN` 配置，并新增接口冒烟测试覆盖。
+- 2026-03-10：优化 `/api/neko/query` 排障信息：当上游返回 HTML/非 JSON 时，在日志输出 `content-type` 并在报错中提示 WAF/JS Challenge 的可能性与解决方向。
+- 2026-03-10：修正 `/api/neko/query` “NewAPI 老版” 走错接口的问题：改为使用 `/v1/dashboard/billing/*`，并新增单测验证不会再请求 `/api/user/self`。
+- 2026-03-11：关闭 `/api/neko/query` “NewAPI 老版” 的调用日志查询：旧版无调用日志接口，前端自动禁用并后端强制不再发起日志请求；新增单测覆盖该行为。
 
 ## 9. 计划变更记录
 

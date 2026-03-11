@@ -148,11 +148,12 @@ def test_public_home_and_tool_config() -> None:
 
     home = client.get("/ui")
     assert home.status_code == 200
-    assert "Key 查询（片段匹配）" in home.text
+    assert "登记Key查询（片段匹配）" in home.text
     assert "API 可用性测试工具" in home.text
-    assert "API 测试" in home.text
+    assert "API 可用性测试" in home.text
     assert "API Key 查询" in home.text
     assert "v0.1.2" in home.text
+    assert 'id="homeNekoQuery" class="home-tab-panel active"' in home.text
 
     home_neko = client.get("/ui", params={"tab": "neko-query"})
     assert home_neko.status_code == 200
@@ -169,3 +170,48 @@ def test_public_home_and_tool_config() -> None:
     assert "defaults" in payload
     assert "llmParser" in payload
     assert "nekoTool" in payload
+
+
+def test_public_neko_query_smoke(monkeypatch) -> None:
+    _reset_db_schema()
+
+    from app.api.routes import public_tools as public_tools_module
+
+    async def fake_query_neko_token(**kwargs):
+        return {
+            "ok": True,
+            "variant": kwargs.get("variant", ""),
+            "baseUrl": kwargs.get("base_url", ""),
+            "tokenMasked": "sk-***",
+            "tokenValid": True,
+            "tokenInfo": None,
+            "logs": [],
+            "stats": {
+                "logCount": 0,
+                "totalQuota": 0.0,
+                "totalPromptTokens": 0,
+                "totalCompletionTokens": 0,
+                "models": {},
+            },
+            "errors": [],
+        }
+
+    monkeypatch.setattr(public_tools_module, "query_neko_token", fake_query_neko_token)
+
+    # This endpoint depends on resources created in FastAPI lifespan (e.g. app.state.http_client).
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/neko/query",
+            json={
+                "token": "sk-test-1234567890",
+                "base_url": "https://example.com",
+                "variant": "newapi_legacy",
+                "fetch_balance": True,
+                "fetch_detail": False,
+                "timeout_sec": 10,
+            },
+        )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["ok"] is True
+    assert payload["variant"] == "newapi_legacy"
