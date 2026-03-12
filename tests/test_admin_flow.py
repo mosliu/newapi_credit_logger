@@ -166,6 +166,8 @@ def test_admin_source_management_flow() -> None:
 
     records_page = client.get(f"/admin/sources/{source_id}/records")
     assert records_page.status_code == 200
+    assert 'name="start_date"' in records_page.text
+    assert 'name="end_date"' in records_page.text
 
     with SessionLocal() as db:
         count = db.query(BalanceRecord).filter(BalanceRecord.source_id == source_id).count()

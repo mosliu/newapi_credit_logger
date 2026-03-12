@@ -439,17 +439,33 @@ async def admin_source_delete(source_id: int, db: Session = Depends(get_db)) -> 
 async def admin_source_records(
     request: Request,
     source_id: int,
+    start_day: date | None = Query(default=None, alias="start_date"),
+    end_day: date | None = Query(default=None, alias="end_date"),
     day: date | None = Query(default=None, alias="date"),
     start_at: datetime | None = Query(default=None),
     end_at: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
+    filter_message: str | None = None
     if start_at is None and end_at is None:
-        selected_day = day or datetime.now().date()
-        start_at = datetime.combine(selected_day, time.min)
-        end_at = start_at + timedelta(days=1)
+        if start_day is None and end_day is None:
+            selected_start = day or datetime.now().date()
+            selected_end = selected_start
+        else:
+            selected_start = start_day or end_day or datetime.now().date()
+            selected_end = end_day or start_day or selected_start
+
+        if selected_end < selected_start:
+            filter_message = "结束日期早于起始日期，已自动交换。"
+            selected_start, selected_end = selected_end, selected_start
+
+        start_at = datetime.combine(selected_start, time.min)
+        end_at = datetime.combine(selected_end, time.min) + timedelta(days=1)
+        start_day = selected_start
+        end_day = selected_end
     else:
-        selected_day = day
+        start_day = start_at.date() if start_at else (end_at.date() if end_at else start_day)
+        end_day = end_at.date() if end_at else start_day
 
     source, records = get_source_detail(db, source_id, start_at=start_at, end_at=end_at)
     if source is None:
@@ -465,9 +481,11 @@ async def admin_source_records(
             "records": records,
             "failed_records": failed_records,
             "chart_points": chart_points,
-            "filter_date": selected_day.isoformat() if selected_day else "",
+            "filter_start_date": start_day.isoformat() if start_day else "",
+            "filter_end_date": end_day.isoformat() if end_day else "",
             "range_start": start_at.strftime("%Y-%m-%d %H:%M:%S") if start_at else "",
             "range_end": end_at.strftime("%Y-%m-%d %H:%M:%S") if end_at else "",
+            "filter_message": filter_message or "",
             "is_admin_authenticated": is_admin_authenticated(request),
         },
     )

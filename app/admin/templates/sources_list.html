@@ -137,6 +137,40 @@
         .toast { left: 14px; right: 14px; top: 14px; }
         .info-grid { grid-template-columns: 1fr; }
     }
+
+    .th-sort {
+        all: unset;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        cursor: pointer;
+        user-select: none;
+    }
+    .th-sort:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 4px var(--ring);
+        border-radius: 10px;
+    }
+    .sort-indicator {
+        margin-left: auto;
+        width: 0;
+        height: 0;
+        border-left: 4px solid transparent;
+        border-right: 4px solid transparent;
+        border-top: 6px solid currentColor;
+        opacity: 0.22;
+        transform: translateY(1px);
+        transition: transform 160ms ease-out, opacity 160ms ease-out;
+    }
+    th[aria-sort="ascending"] .sort-indicator {
+        opacity: 0.9;
+        transform: translateY(1px) rotate(180deg);
+    }
+    th[aria-sort="descending"] .sort-indicator {
+        opacity: 0.9;
+        transform: translateY(1px) rotate(0deg);
+    }
 </style>
 {% endblock %}
 {% block content %}
@@ -172,32 +206,32 @@
 
 <section class="card reveal">
     <div class="table-wrap">
-        <table>
+        <table id="sources-table">
             <thead>
                 <tr>
-                    <th>ID</th>
-                    <th>名称</th>
-                    <th>Owner / 账号</th>
-                    <th>状态</th>
-                    <th>最近采集</th>
-                    <th>额度</th>
-                    <th>用量</th>
-                    <th>余额</th>
-                    <th>收费信息</th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="number">ID<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="text">名称<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="text">Owner / 账号<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="number">状态<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="datetime">最近采集<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="number">额度<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="number">用量<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="number">余额<span class="sort-indicator" aria-hidden="true"></span></button></th>
+                    <th aria-sort="none"><button class="th-sort" type="button" data-sort-type="number">收费信息<span class="sort-indicator" aria-hidden="true"></span></button></th>
                     <th>操作</th>
                 </tr>
             </thead>
             <tbody>
             {% for item in rows %}
                 <tr>
-                    <td>{{ item.id }}</td>
-                    <td>{{ item.name }}</td>
-                    <td>
+                    <td data-sort-value="{{ item.id }}">{{ item.id }}</td>
+                    <td data-sort-value="{{ item.name }}">{{ item.name }}</td>
+                    <td data-sort-value="{{ item.key_owner }} {{ item.key_account or '' }}">
                         {{ item.key_owner }}<br>
                         <span class="muted">账号: {{ item.key_account or "-" }}</span>
                     </td>
-                    <td>{{ "启用" if item.enabled else "停用" }}</td>
-                    <td>
+                    <td data-sort-value="{{ 1 if item.enabled else 0 }}">{{ "启用" if item.enabled else "停用" }}</td>
+                    <td data-sort-value="{{ item.latest_checked_at.isoformat() if item.latest_checked_at else '' }}">
                         {% if item.latest_checked_at %}{{ item.latest_checked_at }}{% else %}-{% endif %}
                         {% if item.latest_success is sameas true %}
                             <div class="status-ok">成功</div>
@@ -205,28 +239,28 @@
                             <div class="status-bad">失败：{{ item.latest_error or "-" }}</div>
                         {% endif %}
                     </td>
-                    <td>
+                    <td data-sort-value="{{ item.latest_limit_amount if item.latest_limit_amount is not none else '' }}">
                         {% if item.latest_limit_amount is not none %}
-                            {{ item.latest_limit_amount }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                            {{ item.latest_limit_amount }}
                         {% else %}
                             -
                         {% endif %}
                     </td>
-                    <td>
+                    <td data-sort-value="{{ item.latest_usage_amount if item.latest_usage_amount is not none else '' }}">
                         {% if item.latest_usage_amount is not none %}
-                            {{ item.latest_usage_amount }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                            {{ item.latest_usage_amount }}
                         {% else %}
                             -
                         {% endif %}
                     </td>
-                    <td>
+                    <td data-sort-value="{{ item.latest_balance if item.latest_balance is not none else '' }}">
                         {% if item.latest_balance is not none %}
-                            {{ item.latest_balance }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                            {{ item.latest_balance }}
                         {% else %}
                             -
                         {% endif %}
                     </td>
-                    <td>
+                    <td data-sort-value="{{ item.fee_amount if item.fee_amount is not none else '' }}">
                         {% if item.fee_amount is not none %}
                             {{ item.fee_amount }} {{ item.fee_currency or "" }}
                         {% else %}
@@ -308,9 +342,9 @@
                                 <div class="info-item">
                                     <div class="info-label">额度 / 用量 / 余额</div>
                                     <div class="info-value">
-                                        额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}<br>
-                                        用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}<br>
-                                        余额: {{ item.latest_balance if item.latest_balance is not none else "-" }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                                        额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}<br>
+                                        用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}<br>
+                                        余额: {{ item.latest_balance if item.latest_balance is not none else "-" }}
                                     </div>
                                 </div>
                             </div>
@@ -352,12 +386,12 @@
   }
 
   const modal = document.getElementById("more-modal");
-  if (!modal) return;
   const title = document.getElementById("more-modal-title");
   const subtitle = document.getElementById("more-modal-subtitle");
   const body = document.getElementById("more-modal-body");
 
   const close = () => {
+    if (!modal) return;
     modal.classList.remove("open");
     const onEnd = () => {
       modal.hidden = true;
@@ -370,6 +404,7 @@
   };
 
   const open = (id, name) => {
+    if (!modal) return;
     const tpl = document.getElementById(`more-tpl-${id}`);
     if (!tpl) return;
     body.replaceChildren(tpl.content.cloneNode(true));
@@ -396,7 +431,70 @@
   });
 
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && !modal.hidden) close();
+    if (ev.key === "Escape" && modal && !modal.hidden) close();
+  });
+
+  const table = document.getElementById("sources-table");
+  if (!table) return;
+  const tbody = table.querySelector("tbody");
+  const thButtons = table.querySelectorAll("thead .th-sort[data-sort-type]");
+  const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+  let active = { index: -1, direction: "ascending" };
+
+  const parseValue = (raw, type) => {
+    const value = (raw || "").trim();
+    if (!value) return { missing: true, value: null };
+    if (type === "number") {
+      const num = Number.parseFloat(value);
+      return Number.isFinite(num) ? { missing: false, value: num } : { missing: true, value: null };
+    }
+    if (type === "datetime") {
+      const ts = Date.parse(value);
+      return Number.isFinite(ts) ? { missing: false, value: ts } : { missing: true, value: null };
+    }
+    return { missing: false, value: value.toLowerCase() };
+  };
+
+  const clearSort = () => {
+    thButtons.forEach((btn) => btn.closest("th")?.setAttribute("aria-sort", "none"));
+  };
+
+  const sortBy = (index, type) => {
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const direction =
+      active.index === index && active.direction === "ascending" ? "descending" : "ascending";
+    active = { index, direction };
+
+    clearSort();
+    const activeTh = table.querySelectorAll("thead th")[index];
+    if (activeTh) activeTh.setAttribute("aria-sort", direction);
+
+    const prepared = rows.map((row, i) => {
+      const cell = row.children[index];
+      const raw = cell?.dataset?.sortValue ?? cell?.textContent ?? "";
+      return { row, i, parsed: parseValue(raw, type) };
+    });
+
+    prepared.sort((a, b) => {
+      if (a.parsed.missing && b.parsed.missing) return a.i - b.i;
+      if (a.parsed.missing) return 1;
+      if (b.parsed.missing) return -1;
+
+      let cmp = 0;
+      if (type === "text") cmp = collator.compare(a.parsed.value, b.parsed.value);
+      else cmp = a.parsed.value - b.parsed.value;
+
+      if (cmp === 0) cmp = a.i - b.i;
+      return direction === "ascending" ? cmp : -cmp;
+    });
+
+    tbody.replaceChildren(...prepared.map((item) => item.row));
+  };
+
+  thButtons.forEach((btn) => {
+    const th = btn.closest("th");
+    if (!th) return;
+    btn.addEventListener("click", () => sortBy(th.cellIndex, btn.dataset.sortType));
   });
 })();
 </script>

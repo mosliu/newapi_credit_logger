@@ -20,10 +20,13 @@
 
 <section class="card reveal">
     <form method="get" action="/admin/sources/{{ source.id }}/records" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-        <input type="date" name="date" value="{{ filter_date }}" style="max-width:220px;">
+        <input type="date" name="start_date" value="{{ filter_start_date }}" style="max-width:220px;">
+        <span class="muted">至</span>
+        <input type="date" name="end_date" value="{{ filter_end_date }}" style="max-width:220px;">
         <button class="btn" type="submit">查询</button>
         <a class="btn btn-muted" href="/admin/sources/{{ source.id }}/records">今天</a>
-        <span class="muted">范围：{{ range_start }} ~ {{ range_end }}（默认：当天 00:00 到次日 00:00）</span>
+        <span class="muted">范围：{{ range_start }} ~ {{ range_end }}（按日期：起始 00:00，结束+1 日 00:00）</span>
+        {% if filter_message %}<span class="muted">{{ filter_message }}</span>{% endif %}
     </form>
 </section>
 
