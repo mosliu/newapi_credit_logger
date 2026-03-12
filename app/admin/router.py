@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -18,13 +18,20 @@ from app.services.admin_auth_service import (
     verify_admin_password,
 )
 from app.services.providers.catalog import get_provider_options
-from app.services.query_service import build_chart_points, get_source_detail, list_source_dashboard
+from app.services.query_service import (
+    build_chart_points,
+    get_source_detail,
+    list_source_balance_changes,
+    list_source_dashboard,
+)
 from app.services.source_service import create_source, delete_source, get_source, update_source
 from app.tasks.scheduler_service import source_scheduler_service
 
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["app_version"] = get_settings().app_version
+
+_ADMIN_TOAST_SESSION_KEY = "admin_toast"
 
 
 def _as_optional(text: str | None) -> str | None:
@@ -45,6 +52,20 @@ def _validation_message(exc: ValidationError) -> str:
 
 def _redirect(url: str) -> RedirectResponse:
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+
+def _set_toast(request: Request, message: str) -> None:
+    if "session" not in request.scope:
+        return
+    request.session[_ADMIN_TOAST_SESSION_KEY] = message
+
+
+def _pop_toast(request: Request) -> str | None:
+    if "session" not in request.scope:
+        return None
+    value = request.session.pop(_ADMIN_TOAST_SESSION_KEY, None)
+    if value is None:
+        return None
+    return str(value)
 
 
 def _render_form(
@@ -142,12 +163,36 @@ async def admin_sources(
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     rows = list_source_dashboard(db, key_owner=key_owner)
+    toast = _pop_toast(request)
     return templates.TemplateResponse(
         request=request,
         name="sources_list.html",
         context={
             "rows": rows,
             "key_owner": key_owner or "",
+            "toast": toast or "",
+            "is_admin_authenticated": is_admin_authenticated(request),
+        },
+    )
+
+
+@router.get("/sources/analyze", response_class=HTMLResponse)
+async def admin_sources_analyze(
+    request: Request,
+    minutes: int = Query(default=30, ge=1, le=1440),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    window_end = datetime.utcnow()
+    window_start = window_end - timedelta(minutes=minutes)
+    rows = list_source_balance_changes(db, window_start=window_start, window_end=window_end)
+    return templates.TemplateResponse(
+        request=request,
+        name="source_analyze.html",
+        context={
+            "rows": rows,
+            "minutes": minutes,
+            "range_start": window_start.strftime("%Y-%m-%d %H:%M:%S"),
+            "range_end": window_end.strftime("%Y-%m-%d %H:%M:%S"),
             "is_admin_authenticated": is_admin_authenticated(request),
         },
     )
@@ -358,11 +403,27 @@ async def admin_source_toggle(source_id: int, db: Session = Depends(get_db)) -> 
 
 
 @router.post("/sources/{source_id}/check-now")
-async def admin_source_check_now(source_id: int) -> RedirectResponse:
-    ok = source_scheduler_service.collect_now(source_id)
+async def admin_source_check_now(request: Request, source_id: int) -> RedirectResponse:
+    return_to = "/admin/sources"
+    try:
+        form = await request.form()
+        candidate = str(form.get("return_to", "")).strip()
+        if candidate.startswith("/admin/sources"):
+            return_to = candidate
+    except Exception:  # noqa: BLE001
+        pass
+
+    try:
+        ok = source_scheduler_service.collect_now(source_id)
+    except Exception:  # noqa: BLE001
+        _set_toast(request, "采集失败：请查看日志排障")
+        return _redirect(return_to)
+
     if not ok:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
-    return _redirect(f"/admin/sources/{source_id}/records")
+
+    _set_toast(request, "采集完成：已写入最新记录")
+    return _redirect(return_to)
 
 
 @router.post("/sources/{source_id}/delete")
@@ -378,10 +439,18 @@ async def admin_source_delete(source_id: int, db: Session = Depends(get_db)) -> 
 async def admin_source_records(
     request: Request,
     source_id: int,
+    day: date | None = Query(default=None, alias="date"),
     start_at: datetime | None = Query(default=None),
     end_at: datetime | None = Query(default=None),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
+    if start_at is None and end_at is None:
+        selected_day = day or datetime.now().date()
+        start_at = datetime.combine(selected_day, time.min)
+        end_at = start_at + timedelta(days=1)
+    else:
+        selected_day = day
+
     source, records = get_source_detail(db, source_id, start_at=start_at, end_at=end_at)
     if source is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
@@ -396,8 +465,9 @@ async def admin_source_records(
             "records": records,
             "failed_records": failed_records,
             "chart_points": chart_points,
-            "start_at": start_at.isoformat() if start_at else "",
-            "end_at": end_at.isoformat() if end_at else "",
+            "filter_date": selected_day.isoformat() if selected_day else "",
+            "range_start": start_at.strftime("%Y-%m-%d %H:%M:%S") if start_at else "",
+            "range_end": end_at.strftime("%Y-%m-%d %H:%M:%S") if end_at else "",
             "is_admin_authenticated": is_admin_authenticated(request),
         },
     )

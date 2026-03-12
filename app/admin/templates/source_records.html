@@ -19,10 +19,11 @@
 </section>
 
 <section class="card reveal">
-    <form method="get" action="/admin/sources/{{ source.id }}/records" style="display:flex;gap:10px;flex-wrap:wrap;">
-        <input type="text" name="start_at" value="{{ start_at }}" placeholder="开始时间 ISO8601">
-        <input type="text" name="end_at" value="{{ end_at }}" placeholder="结束时间 ISO8601">
-        <button class="btn" type="submit">筛选</button>
+    <form method="get" action="/admin/sources/{{ source.id }}/records" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="date" name="date" value="{{ filter_date }}" style="max-width:220px;">
+        <button class="btn" type="submit">查询</button>
+        <a class="btn btn-muted" href="/admin/sources/{{ source.id }}/records">今天</a>
+        <span class="muted">范围：{{ range_start }} ~ {{ range_end }}（默认：当天 00:00 到次日 00:00）</span>
     </form>
 </section>
 

@@ -1,13 +1,164 @@
 {% extends "base.html" %}
 {% block title %}监控源管理{% endblock %}
+{% block head %}
+<style>
+    .toast {
+        position: fixed;
+        top: 18px;
+        right: 18px;
+        z-index: 100;
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 12px;
+        min-width: 240px;
+        max-width: min(460px, calc(100vw - 32px));
+        border-radius: 14px;
+        border: 0.5px solid var(--line);
+        background: var(--panel-strong);
+        backdrop-filter: blur(18px) saturate(160%);
+        -webkit-backdrop-filter: blur(18px) saturate(160%);
+        box-shadow: var(--shadow-window), inset 0 1px 0 rgba(255, 255, 255, 0.44);
+        opacity: 0;
+        transform: translateY(-8px);
+        pointer-events: none;
+        transition: opacity 180ms ease-out, transform 180ms ease-out;
+    }
+    .toast.show {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+    .toast-title {
+        font-weight: 750;
+        font-size: 13px;
+        letter-spacing: -0.01em;
+    }
+    .toast-msg {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.45;
+        margin-top: 2px;
+        word-break: break-word;
+    }
+    .toast-close {
+        border: 0.5px solid var(--line);
+        background: rgba(255, 255, 255, 0.42);
+        color: inherit;
+        border-radius: 10px;
+        padding: 6px 9px;
+        cursor: pointer;
+        font-size: 12px;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+    @media (prefers-color-scheme: dark) {
+        .toast-close { background: rgba(255, 255, 255, 0.08); }
+    }
+
+    .more-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 90;
+        display: grid;
+        place-items: center;
+        padding: 18px 14px;
+    }
+    .more-modal[hidden] { display: none; }
+    .more-backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.18);
+        backdrop-filter: blur(1px);
+    }
+    .more-sheet {
+        position: relative;
+        width: min(920px, 100%);
+        max-height: min(78vh, 720px);
+        overflow: hidden;
+        transform: translateY(10px) scale(0.985);
+        opacity: 0;
+        transition: transform 220ms cubic-bezier(.22,.68,.2,1), opacity 220ms cubic-bezier(.22,.68,.2,1);
+    }
+    .more-modal.open .more-sheet {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+    .more-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 14px 16px 10px;
+        border-bottom: 0.5px solid var(--line);
+        background: rgba(255, 255, 255, 0.06);
+    }
+    .more-title {
+        font-size: 16px;
+        font-weight: 760;
+        letter-spacing: -0.02em;
+    }
+    .more-subtitle { margin-top: 4px; }
+    .more-body {
+        padding: 14px 16px 16px;
+        overflow: auto;
+        max-height: calc(min(78vh, 720px) - 62px);
+    }
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+    .info-item {
+        border-radius: 14px;
+        border: 0.5px solid var(--line);
+        background: rgba(255, 255, 255, 0.46);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38);
+        padding: 11px 12px;
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+    }
+    @media (prefers-color-scheme: dark) {
+        .info-item { background: rgba(255, 255, 255, 0.06); }
+    }
+    .info-label {
+        font-size: 12px;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+    }
+    .info-value {
+        font-size: 13px;
+        line-height: 1.45;
+        word-break: break-word;
+        white-space: pre-wrap;
+        min-width: 0;
+    }
+    @media (max-width: 900px) {
+        .toast { left: 14px; right: 14px; top: 14px; }
+        .info-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
 {% block content %}
+{% if toast %}
+<div class="toast" id="toast" role="status" aria-live="polite">
+    <div style="flex:1;min-width:0;">
+        <div class="toast-title">提示</div>
+        <div class="toast-msg">{{ toast }}</div>
+    </div>
+    <button class="toast-close" type="button" data-toast-close>关闭</button>
+</div>
+{% endif %}
 <section class="card reveal">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
         <div>
             <h2 class="card-title">监控源管理</h2>
             <div class="muted">管理配置、启停调度、手动采集与记录追踪。</div>
         </div>
-        <a class="btn" href="/admin/sources/new">新增监控源</a>
+        <div class="actions">
+            <a class="btn btn-muted" href="/admin/sources/analyze">分析监控源</a>
+            <a class="btn" href="/admin/sources/new">新增监控源</a>
+        </div>
     </div>
 </section>
 
@@ -27,12 +178,12 @@
                     <th>ID</th>
                     <th>名称</th>
                     <th>Owner / 账号</th>
-                    <th>客户信息</th>
-                    <th>地址</th>
-                    <th>收费信息</th>
                     <th>状态</th>
-                    <th>最近余额</th>
-                    <th>最近结果</th>
+                    <th>最近采集</th>
+                    <th>额度</th>
+                    <th>用量</th>
+                    <th>余额</th>
+                    <th>收费信息</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -45,27 +196,7 @@
                         {{ item.key_owner }}<br>
                         <span class="muted">账号: {{ item.key_account or "-" }}</span>
                     </td>
-                    <td>{{ item.customer_info or "-" }}</td>
-                    <td>{{ item.base_url }}</td>
-                    <td>
-                        {% if item.fee_amount is not none %}
-                            {{ item.fee_amount }} {{ item.fee_currency or "" }}
-                        {% else %}
-                            -
-                        {% endif %}
-                        <br>
-                        <span class="muted">创建: {% if item.key_created_at %}{{ item.key_created_at }}{% else %}-{% endif %}</span>
-                    </td>
                     <td>{{ "启用" if item.enabled else "停用" }}</td>
-                    <td>
-                        {% if item.latest_balance is not none %}
-                            余额: {{ item.latest_balance }} {{ item.latest_currency or "" }}<br>
-                            额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}<br>
-                            用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}
-                        {% else %}
-                            -
-                        {% endif %}
-                    </td>
                     <td>
                         {% if item.latest_checked_at %}{{ item.latest_checked_at }}{% else %}-{% endif %}
                         {% if item.latest_success is sameas true %}
@@ -75,11 +206,41 @@
                         {% endif %}
                     </td>
                     <td>
+                        {% if item.latest_limit_amount is not none %}
+                            {{ item.latest_limit_amount }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.latest_usage_amount is not none %}
+                            {{ item.latest_usage_amount }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.latest_balance is not none %}
+                            {{ item.latest_balance }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.fee_amount is not none %}
+                            {{ item.fee_amount }} {{ item.fee_currency or "" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
                         <div class="actions compact">
+                            <button class="btn btn-muted" type="button" data-open-more="{{ item.id }}" data-source-name="{{ item.name }}">更多信息</button>
                             <a class="btn btn-muted" href="/admin/sources/{{ item.id }}/edit">编辑</a>
                             <a class="btn btn-muted" href="/admin/sources/new?copy_from={{ item.id }}">复制新增</a>
                             <a class="btn btn-muted" href="/admin/sources/{{ item.id }}/records">记录</a>
                             <form class="inline" method="post" action="/admin/sources/{{ item.id }}/check-now">
+                                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
                                 <button class="btn btn-ok" type="submit">立即采集</button>
                             </form>
                             <form class="inline" method="post" action="/admin/sources/{{ item.id }}/toggle">
@@ -89,6 +250,71 @@
                                 <button class="btn btn-danger" type="submit">删除</button>
                             </form>
                         </div>
+                        <template id="more-tpl-{{ item.id }}">
+                            <div class="info-grid">
+                                <div class="info-item">
+                                    <div class="info-label">名称</div>
+                                    <div class="info-value">{{ item.name }}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Provider</div>
+                                    <div class="info-value">{{ item.provider_type }}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">地址</div>
+                                    <div class="info-value">{{ item.base_url }}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Owner / 账号</div>
+                                    <div class="info-value">{{ item.key_owner }}{% if item.key_account %} / {{ item.key_account }}{% endif %}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">客户信息</div>
+                                    <div class="info-value">{{ item.customer_info or "-" }}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">Key 创建时间</div>
+                                    <div class="info-value">{% if item.key_created_at %}{{ item.key_created_at }}{% else %}-{% endif %}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">收费信息</div>
+                                    <div class="info-value">
+                                        {% if item.fee_amount is not none %}
+                                            {{ item.fee_amount }} {{ item.fee_currency or "" }}
+                                        {% else %}
+                                            -
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">采集周期 / 超时</div>
+                                    <div class="info-value">{{ item.interval_seconds }} 秒 / {{ item.timeout_seconds }} 秒</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">备注</div>
+                                    <div class="info-value">{{ item.remark or "-" }}</div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">最近采集</div>
+                                    <div class="info-value">
+                                        {% if item.latest_checked_at %}{{ item.latest_checked_at }}{% else %}-{% endif %}
+                                        {% if item.latest_success is sameas true %}
+                                            <div class="status-ok">成功</div>
+                                        {% elif item.latest_success is sameas false %}
+                                            <div class="status-bad">失败：{{ item.latest_error or "-" }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="info-item">
+                                    <div class="info-label">额度 / 用量 / 余额</div>
+                                    <div class="info-value">
+                                        额度: {{ item.latest_limit_amount if item.latest_limit_amount is not none else "-" }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}<br>
+                                        用量: {{ item.latest_usage_amount if item.latest_usage_amount is not none else "-" }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}<br>
+                                        余额: {{ item.latest_balance if item.latest_balance is not none else "-" }}{% if item.latest_currency %} {{ item.latest_currency }}{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </td>
                 </tr>
             {% else %}
@@ -98,4 +324,80 @@
         </table>
     </div>
 </section>
+
+<div class="more-modal" id="more-modal" hidden>
+    <div class="more-backdrop" data-more-backdrop></div>
+    <div class="glass-panel more-sheet" role="dialog" aria-modal="true" aria-labelledby="more-modal-title">
+        <div class="more-head">
+            <div style="min-width:0;">
+                <div class="more-title" id="more-modal-title">更多信息</div>
+                <div class="muted more-subtitle" id="more-modal-subtitle"></div>
+            </div>
+            <button class="btn btn-muted" type="button" data-more-close>关闭</button>
+        </div>
+        <div class="more-body" id="more-modal-body"></div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+  const toast = document.getElementById("toast");
+  if (toast) {
+    const closeBtn = toast.querySelector("[data-toast-close]");
+    const hide = () => toast.classList.remove("show");
+    closeBtn?.addEventListener("click", hide);
+    requestAnimationFrame(() => toast.classList.add("show"));
+    setTimeout(hide, 2600);
+  }
+
+  const modal = document.getElementById("more-modal");
+  if (!modal) return;
+  const title = document.getElementById("more-modal-title");
+  const subtitle = document.getElementById("more-modal-subtitle");
+  const body = document.getElementById("more-modal-body");
+
+  const close = () => {
+    modal.classList.remove("open");
+    const onEnd = () => {
+      modal.hidden = true;
+      modal.removeEventListener("transitionend", onEnd);
+    };
+    modal.addEventListener("transitionend", onEnd);
+    setTimeout(() => {
+      if (!modal.hidden && !modal.classList.contains("open")) modal.hidden = true;
+    }, 260);
+  };
+
+  const open = (id, name) => {
+    const tpl = document.getElementById(`more-tpl-${id}`);
+    if (!tpl) return;
+    body.replaceChildren(tpl.content.cloneNode(true));
+    title.textContent = "更多信息";
+    subtitle.textContent = `#${id}${name ? " · " + name : ""}`;
+    modal.hidden = false;
+    requestAnimationFrame(() => modal.classList.add("open"));
+  };
+
+  document.addEventListener("click", (ev) => {
+    const opener = ev.target.closest("[data-open-more]");
+    if (opener) {
+      ev.preventDefault();
+      open(opener.dataset.openMore, opener.dataset.sourceName || "");
+      return;
+    }
+    if (ev.target.closest("[data-more-close]")) {
+      close();
+      return;
+    }
+    if (ev.target.closest("[data-more-backdrop]")) {
+      close();
+    }
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && !modal.hidden) close();
+  });
+})();
+</script>
 {% endblock %}

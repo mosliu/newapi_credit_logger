@@ -1,7 +1,10 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
+import threading
+import time
 
 from app.core.logging import get_logger
+from app.core.config import get_settings
 from app.db.session import SessionLocal
 from app.models.api_key_source import ApiKeySource
 from app.services.balance_collector_service import collect_balance_for_source
@@ -14,6 +17,25 @@ class SourceSchedulerService:
         self.scheduler = BackgroundScheduler(timezone="UTC")
         self._job_prefix = "source-balance-"
         self._started = False
+        self._request_lock = threading.Lock()
+        self._last_request_started_at: float | None = None
+
+    def _wait_before_request(self) -> None:
+        delay = float(get_settings().scheduler_request_delay_seconds)
+        if delay <= 0:
+            return
+
+        with self._request_lock:
+            now = time.monotonic()
+            if self._last_request_started_at is None:
+                self._last_request_started_at = now
+                return
+
+            wait_seconds = (self._last_request_started_at + delay) - now
+            if wait_seconds > 0:
+                time.sleep(wait_seconds)
+                now = time.monotonic()
+            self._last_request_started_at = now
 
     def start(self) -> None:
         if self._started:
@@ -70,6 +92,7 @@ class SourceSchedulerService:
             if not source.enabled:
                 logger.info("source disabled skip source_id={}", source_id)
                 return
+            self._wait_before_request()
             self._collect_once(db, source)
 
     def collect_now(self, source_id: int) -> bool:

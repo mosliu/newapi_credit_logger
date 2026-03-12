@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}监控源分析{% endblock %}
+{% block content %}
+<section class="card reveal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+            <h2 class="card-title">监控源分析</h2>
+            <div class="muted">按时间窗口统计各监控源“起始余额 / 结束余额 / 变化量”。</div>
+        </div>
+        <div class="actions">
+            <a class="btn btn-muted" href="/admin/sources">返回列表</a>
+        </div>
+    </div>
+</section>
+
+<section class="card reveal">
+    <form method="get" action="/admin/sources/analyze" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <label style="display:flex;gap:8px;align-items:center;">
+            <span class="muted" style="white-space:nowrap;">最近（分钟）</span>
+            <input type="number" name="minutes" value="{{ minutes }}" min="1" max="1440" style="max-width:140px;">
+        </label>
+        <button class="btn" type="submit">查询</button>
+        <span class="muted">范围：{{ range_start }} ~ {{ range_end }}（UTC）</span>
+    </form>
+</section>
+
+<section class="card reveal">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>名称</th>
+                    <th>Owner / 账号</th>
+                    <th>记录数</th>
+                    <th>起始时间</th>
+                    <th>起始余额</th>
+                    <th>结束时间</th>
+                    <th>结束余额</th>
+                    <th>变化</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for item in rows %}
+                <tr>
+                    <td>{{ item.id }}</td>
+                    <td>{{ item.name }}</td>
+                    <td>
+                        {{ item.key_owner }}<br>
+                        <span class="muted">账号: {{ item.key_account or "-" }}</span>
+                    </td>
+                    <td>{{ item.point_count }}</td>
+                    <td>{% if item.first_checked_at %}{{ item.first_checked_at }}{% else %}-{% endif %}</td>
+                    <td>
+                        {% if item.first_balance is not none %}
+                            {{ item.first_balance }}{% if item.currency %} {{ item.currency }}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>{% if item.last_checked_at %}{{ item.last_checked_at }}{% else %}-{% endif %}</td>
+                    <td>
+                        {% if item.last_balance is not none %}
+                            {{ item.last_balance }}{% if item.currency %} {{ item.currency }}{% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.delta_balance is not none %}
+                            {% if item.delta_balance > 0 %}
+                                <span class="status-ok">+{{ item.delta_balance }}</span>
+                            {% elif item.delta_balance < 0 %}
+                                <span class="status-bad">{{ item.delta_balance }}</span>
+                            {% else %}
+                                <span class="muted">0</span>
+                            {% endif %}
+                            {% if item.currency %}<span class="muted">&nbsp;{{ item.currency }}</span>{% endif %}
+                        {% else %}
+                            <span class="muted">记录不足</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr><td colspan="9">暂无监控源</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
+

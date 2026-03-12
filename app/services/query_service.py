@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
+from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
@@ -37,6 +38,7 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
                 "remark": source.remark,
                 "enabled": source.enabled,
                 "interval_seconds": source.interval_seconds,
+                "timeout_seconds": source.timeout_seconds,
                 "latest_success": latest.success if latest else None,
                 "latest_limit_amount": latest.limit_amount if latest else None,
                 "latest_usage_amount": latest.usage_amount if latest else None,
@@ -44,6 +46,59 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
                 "latest_currency": latest.currency if latest else None,
                 "latest_checked_at": latest.checked_at if latest else None,
                 "latest_error": latest.error_message if latest else None,
+            }
+        )
+    return rows
+
+
+def list_source_balance_changes(
+    db: Session,
+    *,
+    window_start: datetime,
+    window_end: datetime,
+) -> list[dict]:
+    sources = db.query(ApiKeySource).order_by(ApiKeySource.id.desc()).all()
+    grouped: dict[int, list[BalanceRecord]] = defaultdict(list)
+
+    records = (
+        db.query(BalanceRecord)
+        .filter(BalanceRecord.checked_at >= window_start)
+        .filter(BalanceRecord.checked_at <= window_end)
+        .filter(BalanceRecord.success.is_(True))
+        .filter(BalanceRecord.balance.isnot(None))
+        .order_by(BalanceRecord.source_id.asc(), BalanceRecord.checked_at.asc(), BalanceRecord.id.asc())
+        .all()
+    )
+    for record in records:
+        grouped[record.source_id].append(record)
+
+    rows: list[dict] = []
+    for source in sources:
+        bucket = grouped.get(source.id, [])
+        first = bucket[0] if bucket else None
+        last = bucket[-1] if bucket else None
+
+        delta_balance = None
+        if first is not None and last is not None and len(bucket) >= 2:
+            try:
+                delta_balance = last.balance - first.balance
+            except Exception:  # noqa: BLE001
+                delta_balance = None
+
+        rows.append(
+            {
+                "id": source.id,
+                "name": source.name,
+                "key_owner": source.key_owner,
+                "key_account": source.key_account,
+                "provider_type": source.provider_type,
+                "currency": last.currency if last else None,
+                "point_count": len(bucket),
+                "first_checked_at": first.checked_at if first else None,
+                "first_balance": first.balance if first else None,
+                "last_checked_at": last.checked_at if last else None,
+                "last_balance": last.balance if last else None,
+                "delta_balance": delta_balance,
             }
         )
     return rows

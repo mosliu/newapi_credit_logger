@@ -89,6 +89,13 @@ def test_admin_source_management_flow() -> None:
     sources_page = client.get("/admin/sources")
     assert sources_page.status_code == 200
     assert f"/admin/sources/new?copy_from={source_id}" in sources_page.text
+    assert "/admin/sources/analyze" in sources_page.text
+
+    analyze_page = client.get("/admin/sources/analyze")
+    assert analyze_page.status_code == 200
+    assert 'name="minutes"' in analyze_page.text
+    assert 'value="30"' in analyze_page.text
+    assert "监控源分析" in analyze_page.text
 
     copied_form = client.get(f"/admin/sources/new?copy_from={source_id}")
     assert copied_form.status_code == 200
