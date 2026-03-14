@@ -1,3 +1,4 @@
+from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
 import threading
@@ -14,7 +15,18 @@ logger = get_logger("scheduler")
 
 class SourceSchedulerService:
     def __init__(self) -> None:
-        self.scheduler = BackgroundScheduler(timezone="UTC")
+        settings = get_settings()
+        self._max_workers = max(int(settings.scheduler_max_workers), 1)
+        self._misfire_grace_seconds = max(
+            int(settings.scheduler_misfire_grace_seconds),
+            1,
+        )
+        self.scheduler = BackgroundScheduler(
+            timezone="UTC",
+            executors={
+                "default": ThreadPoolExecutor(max_workers=self._max_workers),
+            },
+        )
         self._job_prefix = "source-balance-"
         self._started = False
         self._request_lock = threading.Lock()
@@ -43,7 +55,11 @@ class SourceSchedulerService:
         self.scheduler.start()
         self._started = True
         self.reload_jobs()
-        logger.info("scheduler started")
+        logger.info(
+            "scheduler started max_workers={} misfire_grace_seconds={}",
+            self._max_workers,
+            self._misfire_grace_seconds,
+        )
 
     def shutdown(self) -> None:
         if not self._started:
@@ -78,6 +94,7 @@ class SourceSchedulerService:
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
+                misfire_grace_time=self._misfire_grace_seconds,
             )
 
         logger.info("scheduler jobs reloaded count={}", len(sources))

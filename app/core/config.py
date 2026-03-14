@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     default_request_timeout_seconds: int = 20
     default_request_retries: int = 2
     scheduler_request_delay_seconds: float = 1.0
+    scheduler_misfire_grace_seconds: int = 30
+    scheduler_max_workers: int = 20
 
     api_key_encrypt_secret: str = "change-me-in-production"
     admin_password: str = "change-me-admin-password"
