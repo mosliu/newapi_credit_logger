@@ -5,6 +5,7 @@ from app.db.session import SessionLocal, engine
 from app.main import app
 from app.models.api_key_source import ApiKeySource
 from app.models.balance_record import BalanceRecord
+from app.core.config import get_settings
 
 
 def _reset_db_schema() -> None:
@@ -22,7 +23,8 @@ def test_admin_source_management_flow() -> None:
 
     login_page = client.get("/admin/login")
     assert login_page.status_code == 200
-    assert "v0.1.2" in login_page.text
+    assert f"v{get_settings().app_version}" in login_page.text
+    assert "https://github.com/mosliu/newapi_credit_logger" in login_page.text
 
     login = client.post(
         "/admin/login",

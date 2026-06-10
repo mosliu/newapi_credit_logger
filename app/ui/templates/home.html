@@ -2,8 +2,8 @@
 {% block title %}普通用户首页{% endblock %}
 {% block head %}
 <style>
-    .grid-split {
-        grid-template-columns: 1fr 220px;
+    .grid.grid-split {
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
     }
     .home-tab-panel {
         display: none;
@@ -84,6 +84,16 @@
     .check-item input {
         width: auto;
         box-shadow: none;
+    }
+    .quick-control-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+    }
+    .quick-control-row button {
+        white-space: nowrap;
+        padding-inline: 12px;
     }
     .kv-grid {
         display: grid;
@@ -181,6 +191,9 @@
     }
     @media (max-width: 900px) {
         .grid {
+            grid-template-columns: 1fr;
+        }
+        .grid.grid-split {
             grid-template-columns: 1fr;
         }
         .kv-grid {
@@ -322,12 +335,15 @@
                     <label for="nekoBaseUrl">NewAPI 地址（Base URL）</label>
                     <input id="nekoBaseUrl" type="text" placeholder="https://newapi.example.com">
                 </div>
-                <div class="field" style="max-width:220px;">
+                <div class="field">
                     <label for="nekoVariant">NewAPI 版本</label>
-                    <select id="nekoVariant">
-                        <option value="newapi" selected>NewAPI 新版</option>
-                        <option value="newapi_legacy">NewAPI 老版</option>
-                    </select>
+                    <div class="quick-control-row">
+                        <select id="nekoVariant">
+                            <option value="newapi" selected>NewAPI 新版</option>
+                            <option value="newapi_legacy">NewAPI 老版</option>
+                        </select>
+                        <button id="nekoAnyrouterBtn" type="button" class="btn-secondary">Anyrouter</button>
+                    </div>
                 </div>
                 <div class="field">
                     <label for="nekoToken">API Key / Token</label>
@@ -416,6 +432,8 @@ const defaults = {
   gemini:           { baseUrl: "https://generativelanguage.googleapis.com", model: "gemini-3-flash-preview" },
   claude:           { baseUrl: "https://api.anthropic.com",                 model: "claude-sonnet-4-6" }
 };
+
+const ANYROUTER_BASE_URL = "https://a-ocnfniawgw.cn-shanghai.fcapp.run";
 
 let defaultChannel = "openai_responses";
 let defaultCliProfile = "default";
@@ -753,6 +771,17 @@ el.channel.addEventListener("change", () => applyDefaults(false));
 if (el.nekoVariant) {
   el.nekoVariant.addEventListener("change", () => {
     syncNekoVariantUi();
+  });
+}
+
+const nekoAnyrouterBtn = document.getElementById("nekoAnyrouterBtn");
+if (nekoAnyrouterBtn) {
+  nekoAnyrouterBtn.addEventListener("click", () => {
+    el.nekoBaseUrl.value = ANYROUTER_BASE_URL;
+    el.nekoVariant.value = "newapi_legacy";
+    syncNekoVariantUi();
+    el.nekoInfo.textContent = `已设置 Anyrouter：${ANYROUTER_BASE_URL}，并切换为 NewAPI 老版。`;
+    el.nekoBaseUrl.focus();
   });
 }
 

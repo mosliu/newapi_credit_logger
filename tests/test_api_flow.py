@@ -1,11 +1,13 @@
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import event
 
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.main import app
 from app.models.api_key_source import ApiKeySource
 from app.models.balance_record import BalanceRecord
+from app.core.config import get_settings
+from app.services.query_service import list_source_dashboard
 
 
 def _reset_db_schema() -> None:
@@ -63,10 +65,19 @@ def test_source_crud_and_manual_collect() -> None:
     listed = client.get("/api/sources")
     assert listed.status_code == 200
     assert len(listed.json()) >= 1
+    listed_source = next(item for item in listed.json() if item["id"] == source_id)
+    assert listed_source["latest_success"] is False
+    assert listed_source["latest_checked_at"]
+    assert listed_source["latest_error_message"]
 
     with SessionLocal() as db:
         count = db.query(BalanceRecord).filter(BalanceRecord.source_id == source_id).count()
         assert count >= 1
+        source = db.query(ApiKeySource).filter(ApiKeySource.id == source_id).first()
+        assert source is not None
+        assert source.latest_success is False
+        assert source.latest_checked_at is not None
+        assert source.latest_error_message
 
     deleted = client.delete(f"/api/sources/{source_id}")
     assert deleted.status_code == 204
@@ -103,22 +114,13 @@ def test_public_key_fragment_search() -> None:
     assert client.post("/api/sources", json=second_payload).status_code == 201
 
     with SessionLocal() as db:
-        db.execute(
-            text(
-                """
-                INSERT INTO balance_record
-                (source_id, success, limit_amount, usage_amount, balance, currency)
-                VALUES (:source_id, 1, :limit_amount, :usage_amount, :balance, :currency)
-                """
-            ),
-            {
-                "source_id": first_source_id,
-                "limit_amount": 100.5,
-                "usage_amount": 33.2,
-                "balance": 67.3,
-                "currency": "USD",
-            },
-        )
+        source = db.query(ApiKeySource).filter(ApiKeySource.id == first_source_id).first()
+        assert source is not None
+        source.latest_success = True
+        source.latest_limit_amount = 100.5
+        source.latest_usage_amount = 33.2
+        source.latest_balance = 67.3
+        source.latest_currency = "USD"
         db.commit()
 
     by_prefix = client.get("/ui/key-search", params={"key_fragment": "sk-prefix-search"})
@@ -142,17 +144,65 @@ def test_public_key_fragment_search() -> None:
     assert "至少 12 位 key 片段" in too_short.text
 
 
+def test_source_dashboard_uses_source_snapshot_without_balance_record_lookup() -> None:
+    _reset_db_schema()
+    client = TestClient(app)
+    payload = {
+        "name": "snapshot-source",
+        "provider_type": "newapi",
+        "base_url": "http://127.0.0.1:9",
+        "api_key": "sk-snapshot-1234567890",
+        "key_owner": "snapshot-owner",
+        "interval_seconds": 60,
+        "timeout_seconds": 2,
+        "enabled": True,
+    }
+    created = client.post("/api/sources", json=payload)
+    assert created.status_code == 201
+
+    with SessionLocal() as db:
+        source = db.query(ApiKeySource).filter(ApiKeySource.id == created.json()["id"]).first()
+        assert source is not None
+        source.latest_success = True
+        source.latest_limit_amount = 200
+        source.latest_usage_amount = 25
+        source.latest_balance = 175
+        source.latest_currency = "USD"
+        db.commit()
+
+    statements: list[str] = []
+
+    def _capture_sql(_conn, _cursor, statement, _parameters, _context, _executemany):
+        statements.append(str(statement).lower())
+
+    event.listen(engine, "before_cursor_execute", _capture_sql)
+    try:
+        with SessionLocal() as db:
+            rows = list_source_dashboard(db)
+    finally:
+        event.remove(engine, "before_cursor_execute", _capture_sql)
+
+    assert rows[0]["latest_balance"] == 175
+    assert not any("balance_record" in statement for statement in statements)
+
+
 def test_public_home_and_tool_config() -> None:
     _reset_db_schema()
     client = TestClient(app)
 
     home = client.get("/ui")
     assert home.status_code == 200
+    assert "ApiKey查询监控面板" in home.text
+    assert "mosliu's newapi key monitoring view" in home.text
     assert "登记Key查询（片段匹配）" in home.text
     assert "API 可用性测试工具" in home.text
     assert "API 可用性测试" in home.text
     assert "API Key 查询" in home.text
-    assert "v0.1.2" in home.text
+    assert "Anyrouter" in home.text
+    assert "https://a-ocnfniawgw.cn-shanghai.fcapp.run" in home.text
+    assert 'el.nekoVariant.value = "newapi_legacy"' in home.text
+    assert f"v{get_settings().app_version}" in home.text
+    assert "https://github.com/mosliu/newapi_credit_logger" in home.text
     assert 'id="homeNekoQuery" class="home-tab-panel active"' in home.text
 
     home_neko = client.get("/ui", params={"tab": "neko-query"})

@@ -31,6 +31,19 @@ def collect_balance_for_source(db: Session, source: ApiKeySource) -> BalanceReco
         response_excerpt=result.response_excerpt,
     )
     db.add(record)
+    db.flush()
+    db.refresh(record)
+
+    source.latest_success = record.success
+    source.latest_limit_amount = record.limit_amount
+    source.latest_usage_amount = record.usage_amount
+    source.latest_balance = record.balance
+    source.latest_currency = record.currency
+    source.latest_checked_at = record.checked_at
+    source.latest_http_status = record.http_status
+    source.latest_latency_ms = record.latency_ms
+    source.latest_error_message = record.error_message
+    db.add(source)
     db.commit()
     db.refresh(record)
 

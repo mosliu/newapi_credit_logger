@@ -17,12 +17,6 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
     sources = query.all()
     rows: list[dict] = []
     for source in sources:
-        latest = (
-            db.query(BalanceRecord)
-            .filter(BalanceRecord.source_id == source.id)
-            .order_by(BalanceRecord.checked_at.desc(), BalanceRecord.id.desc())
-            .first()
-        )
         rows.append(
             {
                 "id": source.id,
@@ -39,13 +33,13 @@ def list_source_dashboard(db: Session, key_owner: str | None = None) -> list[dic
                 "enabled": source.enabled,
                 "interval_seconds": source.interval_seconds,
                 "timeout_seconds": source.timeout_seconds,
-                "latest_success": latest.success if latest else None,
-                "latest_limit_amount": latest.limit_amount if latest else None,
-                "latest_usage_amount": latest.usage_amount if latest else None,
-                "latest_balance": latest.balance if latest else None,
-                "latest_currency": latest.currency if latest else None,
-                "latest_checked_at": latest.checked_at if latest else None,
-                "latest_error": latest.error_message if latest else None,
+                "latest_success": source.latest_success,
+                "latest_limit_amount": source.latest_limit_amount,
+                "latest_usage_amount": source.latest_usage_amount,
+                "latest_balance": source.latest_balance,
+                "latest_currency": source.latest_currency,
+                "latest_checked_at": source.latest_checked_at,
+                "latest_error": source.latest_error_message,
             }
         )
     return rows
@@ -121,12 +115,6 @@ def search_sources_by_key_fragment(db: Session, key_fragment: str) -> tuple[list
         score = _match_score(raw_api_key, fragment)
         if score <= 0:
             continue
-        latest = (
-            db.query(BalanceRecord)
-            .filter(BalanceRecord.source_id == source.id)
-            .order_by(BalanceRecord.checked_at.desc(), BalanceRecord.id.desc())
-            .first()
-        )
 
         rows.append(
             {
@@ -135,9 +123,9 @@ def search_sources_by_key_fragment(db: Session, key_fragment: str) -> tuple[list
                 "key_owner": source.key_owner,
                 "api_key_masked": mask_api_key(raw_api_key),
                 "match_hint": _match_hint(raw_api_key, fragment),
-                "latest_limit_amount": latest.limit_amount if latest else None,
-                "latest_usage_amount": latest.usage_amount if latest else None,
-                "latest_balance": latest.balance if latest else None,
+                "latest_limit_amount": source.latest_limit_amount,
+                "latest_usage_amount": source.latest_usage_amount,
+                "latest_balance": source.latest_balance,
                 "score": score,
             }
         )

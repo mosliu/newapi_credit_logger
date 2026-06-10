@@ -83,7 +83,7 @@ copy .env.example .env
 重点配置项：
 
 ```env
-APP_VERSION=0.1.2
+APP_VERSION=0.1.3
 DATABASE_URL=sqlite:///./data/newapi_credit_logger.db
 LOG_LEVEL=DEBUG
 DEFAULT_POLL_INTERVAL_SECONDS=300

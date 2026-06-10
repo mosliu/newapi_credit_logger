@@ -25,6 +25,15 @@ class ApiKeySource(Base):
     interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
     timeout_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=20)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    latest_success: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    latest_limit_amount: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=2), nullable=True)
+    latest_usage_amount: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=2), nullable=True)
+    latest_balance: Mapped[Decimal | None] = mapped_column(Numeric(precision=20, scale=2), nullable=True)
+    latest_currency: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    latest_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    latest_http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    latest_latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    latest_error_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

@@ -72,5 +72,14 @@ class SourceResponse(SourceBase):
 
     id: int
     api_key_masked: str
+    latest_success: bool | None = None
+    latest_limit_amount: Decimal | None = None
+    latest_usage_amount: Decimal | None = None
+    latest_balance: Decimal | None = None
+    latest_currency: str | None = None
+    latest_checked_at: datetime | None = None
+    latest_http_status: int | None = None
+    latest_latency_ms: int | None = None
+    latest_error_message: str | None = None
     created_at: datetime
     updated_at: datetime

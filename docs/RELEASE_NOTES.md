@@ -2,6 +2,27 @@
 
 本项目采用 `MAJOR.MINOR.PATCH` 语义化版本号。
 
+## v0.1.3 - 2026-06-10
+
+### Added
+
+- `api_key_source` 新增最新采集快照字段，保存最新采集状态、额度、用量、余额、币种、采集时间、HTTP 状态、耗时与错误信息。
+- `API Key 查询` 页面新增 `Anyrouter` 快捷按钮，点击后自动填充 `https://a-ocnfniawgw.cn-shanghai.fcapp.run` 并切换为 NewAPI 老版。
+
+### Changed
+
+- 管理后台监控源列表与普通用户 Key 片段查询改为直接读取 `api_key_source` 快照，避免记录量大时反复扫描 `balance_record`。
+- 额度刷新时会继续写入 `balance_record` 历史记录，同时同步更新监控源最新快照。
+
+### Migration
+
+- 新增 Alembic 迁移 `a4c9b2d7e8f1`，会补齐快照字段、创建 `balance_record(source_id, checked_at, id)` 复合索引，并从历史记录回填每个监控源最新状态。
+
+### Verification
+
+- 自动化测试：`uv run pytest` 通过（21 passed）。
+- 迁移验证：SQLite 空库执行 `uv run alembic upgrade head` 通过。
+
 ## v0.1.2 - 2026-03-10
 
 ### Changed

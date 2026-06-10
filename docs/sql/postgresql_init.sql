@@ -69,5 +69,121 @@ ALTER TABLE api_key_source ADD COLUMN key_account VARCHAR(120);
 
 UPDATE alembic_version SET version_num='c7f932f7102c' WHERE alembic_version.version_num = '8b9d5e21c0ab';
 
+-- Running upgrade c7f932f7102c -> e3d4b2a19f66
+
+CREATE TABLE token_sync_run (
+    id SERIAL NOT NULL,
+    base_url VARCHAR(255) NOT NULL,
+    user_id VARCHAR(120) NOT NULL,
+    status VARCHAR(20) NOT NULL,
+    fetched_count INTEGER NOT NULL,
+    created_count INTEGER NOT NULL,
+    skipped_count INTEGER NOT NULL,
+    failed_count INTEGER NOT NULL,
+    message VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT (CURRENT_TIMESTAMP) NOT NULL,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX ix_token_sync_run_id ON token_sync_run (id);
+
+UPDATE alembic_version SET version_num='e3d4b2a19f66' WHERE alembic_version.version_num = 'c7f932f7102c';
+
+-- Running upgrade e3d4b2a19f66 -> a4c9b2d7e8f1
+
+ALTER TABLE api_key_source ADD COLUMN latest_success BOOLEAN;
+
+ALTER TABLE api_key_source ADD COLUMN latest_limit_amount NUMERIC(20, 2);
+
+ALTER TABLE api_key_source ADD COLUMN latest_usage_amount NUMERIC(20, 2);
+
+ALTER TABLE api_key_source ADD COLUMN latest_balance NUMERIC(20, 2);
+
+ALTER TABLE api_key_source ADD COLUMN latest_currency VARCHAR(20);
+
+ALTER TABLE api_key_source ADD COLUMN latest_checked_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE api_key_source ADD COLUMN latest_http_status INTEGER;
+
+ALTER TABLE api_key_source ADD COLUMN latest_latency_ms INTEGER;
+
+ALTER TABLE api_key_source ADD COLUMN latest_error_message VARCHAR(500);
+
+CREATE INDEX ix_balance_record_source_checked_id ON balance_record (source_id, checked_at, id);
+
+UPDATE api_key_source
+SET
+    latest_success = (
+        SELECT br.success
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_limit_amount = (
+        SELECT br.limit_amount
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_usage_amount = (
+        SELECT br.usage_amount
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_balance = (
+        SELECT br.balance
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_currency = (
+        SELECT br.currency
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_checked_at = (
+        SELECT br.checked_at
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_http_status = (
+        SELECT br.http_status
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_latency_ms = (
+        SELECT br.latency_ms
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    ),
+    latest_error_message = (
+        SELECT br.error_message
+        FROM balance_record AS br
+        WHERE br.source_id = api_key_source.id
+        ORDER BY br.checked_at DESC, br.id DESC
+        LIMIT 1
+    )
+WHERE EXISTS (
+    SELECT 1
+    FROM balance_record AS br
+    WHERE br.source_id = api_key_source.id
+);
+
+UPDATE alembic_version SET version_num='a4c9b2d7e8f1' WHERE alembic_version.version_num = 'e3d4b2a19f66';
+
 COMMIT;
 
