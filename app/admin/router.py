@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.schemas.source import SourceCreate, SourceUpdate
+from app.api.schemas.source_sync import SourceSyncRequest
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.services.admin_auth_service import (
@@ -25,6 +26,10 @@ from app.services.query_service import (
     list_source_dashboard,
 )
 from app.services.source_service import create_source, delete_source, get_source, update_source
+from app.services.source_sync_service import (
+    list_recent_token_sync_runs,
+    sync_sources_from_newapi_user_account,
+)
 from app.tasks.scheduler_service import source_scheduler_service
 
 router = APIRouter(prefix="/admin")
@@ -127,6 +132,43 @@ def _default_form_data() -> dict:
     }
 
 
+def _default_sync_form_data() -> dict:
+    return {
+        "base_url": "",
+        "user_id": "",
+        "user_token": "",
+        "provider_type": "newapi",
+        "key_owner": "",
+        "interval_seconds": str(get_settings().default_poll_interval_seconds),
+        "timeout_seconds": "20",
+        "enabled": True,
+    }
+
+
+def _render_sync_form(
+    request: Request,
+    *,
+    form_data: dict,
+    runs: list,
+    result: dict | None = None,
+    error: str | None = None,
+    status_code: int = status.HTTP_200_OK,
+) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request=request,
+        name="source_sync.html",
+        context={
+            "form_data": form_data,
+            "runs": runs,
+            "result": result or {},
+            "error": error or "",
+            "provider_options": get_provider_options(),
+            "is_admin_authenticated": is_admin_authenticated(request),
+        },
+        status_code=status_code,
+    )
+
+
 @router.get("/login", response_class=HTMLResponse)
 async def admin_login_form(request: Request) -> Response:
     if is_admin_authenticated(request):
@@ -195,6 +237,83 @@ async def admin_sources_analyze(
             "range_end": window_end.strftime("%Y-%m-%d %H:%M:%S"),
             "is_admin_authenticated": is_admin_authenticated(request),
         },
+    )
+
+
+@router.get("/sources/sync", response_class=HTMLResponse)
+async def admin_sources_sync_form(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    runs = list_recent_token_sync_runs(db, limit=20)
+    return _render_sync_form(
+        request,
+        form_data=_default_sync_form_data(),
+        runs=runs,
+    )
+
+
+@router.post("/sources/sync", response_class=HTMLResponse)
+async def admin_sources_sync_submit(request: Request, db: Session = Depends(get_db)) -> HTMLResponse:
+    form = await request.form()
+    raw_payload = {
+        "base_url": str(form.get("base_url", "")),
+        "user_id": str(form.get("user_id", "")),
+        "user_token": str(form.get("user_token", "")),
+        "provider_type": str(form.get("provider_type", "newapi")),
+        "key_owner": _as_optional(str(form.get("key_owner", ""))),
+        "interval_seconds": str(
+            form.get("interval_seconds", str(get_settings().default_poll_interval_seconds))
+        ),
+        "timeout_seconds": str(form.get("timeout_seconds", "20")),
+        "enabled": bool(form.get("enabled")),
+    }
+    runs = list_recent_token_sync_runs(db, limit=20)
+
+    try:
+        payload = SourceSyncRequest.model_validate(raw_payload)
+    except ValidationError as exc:
+        return _render_sync_form(
+            request,
+            form_data=raw_payload,
+            runs=runs,
+            error=_validation_message(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        result = await sync_sources_from_newapi_user_account(
+            db=db,
+            payload=payload,
+            client=getattr(request.app.state, "http_client", None),
+        )
+    except ValueError as exc:
+        return _render_sync_form(
+            request,
+            form_data=raw_payload,
+            runs=runs,
+            error=str(exc),
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    except RuntimeError as exc:
+        return _render_sync_form(
+            request,
+            form_data=raw_payload,
+            runs=runs,
+            error=str(exc),
+            status_code=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    if result["created_count"] > 0:
+        source_scheduler_service.reload_jobs()
+
+    refreshed_runs = list_recent_token_sync_runs(db, limit=20)
+    synced_form_data = {
+        **raw_payload,
+        "user_token": "",
+    }
+    return _render_sync_form(
+        request,
+        form_data=synced_form_data,
+        runs=refreshed_runs,
+        result=result,
     )
 
 

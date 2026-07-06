@@ -58,6 +58,19 @@ _REQUIRED_TABLE_COLUMNS: dict[str, set[str]] = {
         "error_message",
         "response_excerpt",
     },
+    "token_sync_run": {
+        "id",
+        "base_url",
+        "user_id",
+        "status",
+        "fetched_count",
+        "created_count",
+        "skipped_count",
+        "failed_count",
+        "message",
+        "created_at",
+        "finished_at",
+    },
 }
 
 

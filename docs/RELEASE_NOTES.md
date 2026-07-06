@@ -7,7 +7,7 @@
 ### Added
 
 - `api_key_source` 新增最新采集快照字段，保存最新采集状态、额度、用量、余额、币种、采集时间、HTTP 状态、耗时与错误信息。
-- `API Key 查询` 页面新增 `Anyrouter` 快捷按钮，点击后自动填充 `https://a-ocnfniawgw.cn-shanghai.fcapp.run` 并切换为 NewAPI 老版。
+- `API Key 查询` 页面新增 `Anyrouter` 快捷按钮，点击后自动填充 `https://anyrouter.top` 并切换为 NewAPI 老版。
 
 ### Changed
 

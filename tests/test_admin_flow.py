@@ -177,3 +177,63 @@ def test_admin_source_management_flow() -> None:
 
     deleted = client.post(f"/admin/sources/{source_id}/delete", follow_redirects=False)
     assert deleted.status_code == 303
+
+
+def test_admin_source_sync_page(monkeypatch) -> None:
+    _reset_db_schema()
+
+    from app.admin import router as admin_router_module
+
+    async def fake_sync_sources_from_newapi_user_account(*, db, payload, client=None):
+        return {
+            "run_id": 1,
+            "status": "success",
+            "base_url": payload.base_url,
+            "user_id": payload.user_id,
+            "fetched_count": 3,
+            "created_count": 2,
+            "skipped_count": 1,
+            "failed_count": 0,
+            "message": "同步完成：拉取 3，新增 2，跳过 1，失败 0",
+            "used_endpoint": "/api/token",
+            "created_source_names": ["token-one", "token-two"],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(
+        admin_router_module,
+        "sync_sources_from_newapi_user_account",
+        fake_sync_sources_from_newapi_user_account,
+    )
+
+    client = TestClient(app)
+    login = client.post(
+        "/admin/login",
+        data={"password": "change-me-admin-password"},
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
+
+    page = client.get("/admin/sources/sync")
+    assert page.status_code == 200
+    assert "同步 NewAPI Token" in page.text
+    assert 'name="base_url"' in page.text
+    assert 'name="user_id"' in page.text
+    assert 'name="user_token"' in page.text
+
+    sync_resp = client.post(
+        "/admin/sources/sync",
+        data={
+            "base_url": "https://example.com",
+            "user_id": "1001",
+            "user_token": "sk-sync-token-123456",
+            "provider_type": "newapi",
+            "key_owner": "sync-owner",
+            "interval_seconds": "60",
+            "timeout_seconds": "10",
+            "enabled": "on",
+        },
+    )
+    assert sync_resp.status_code == 200
+    assert "同步完成：拉取 3，新增 2，跳过 1，失败 0" in sync_resp.text
+    assert "token-one" in sync_resp.text

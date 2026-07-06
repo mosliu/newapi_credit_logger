@@ -199,7 +199,7 @@ def test_public_home_and_tool_config() -> None:
     assert "API 可用性测试" in home.text
     assert "API Key 查询" in home.text
     assert "Anyrouter" in home.text
-    assert "https://a-ocnfniawgw.cn-shanghai.fcapp.run" in home.text
+    assert "https://anyrouter.top" in home.text
     assert 'el.nekoVariant.value = "newapi_legacy"' in home.text
     assert f"v{get_settings().app_version}" in home.text
     assert "https://github.com/mosliu/newapi_credit_logger" in home.text
@@ -220,6 +220,55 @@ def test_public_home_and_tool_config() -> None:
     assert "defaults" in payload
     assert "llmParser" in payload
     assert "nekoTool" in payload
+
+
+def test_source_sync_api_smoke(monkeypatch) -> None:
+    _reset_db_schema()
+
+    from app.api.routes import sources as sources_module
+
+    async def fake_sync_sources_from_newapi_user_account(*, db, payload, client=None):
+        return {
+            "run_id": 99,
+            "status": "success",
+            "base_url": payload.base_url,
+            "user_id": payload.user_id,
+            "fetched_count": 2,
+            "created_count": 2,
+            "skipped_count": 0,
+            "failed_count": 0,
+            "message": "同步完成：拉取 2，新增 2，跳过 0，失败 0",
+            "used_endpoint": "/api/token",
+            "created_source_names": ["token-a", "token-b"],
+            "errors": [],
+        }
+
+    monkeypatch.setattr(
+        sources_module,
+        "sync_sources_from_newapi_user_account",
+        fake_sync_sources_from_newapi_user_account,
+    )
+
+    with TestClient(app) as client:
+        resp = client.post(
+            "/api/sources/sync/newapi-user",
+            json={
+                "base_url": "https://example.com",
+                "user_id": "1001",
+                "user_token": "sk-user-token-123456",
+                "provider_type": "newapi",
+                "key_owner": "sync-owner",
+                "interval_seconds": 60,
+                "timeout_seconds": 10,
+                "enabled": True,
+            },
+        )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["status"] == "success"
+    assert payload["created_count"] == 2
+    assert payload["used_endpoint"] == "/api/token"
+    assert payload["created_source_names"] == ["token-a", "token-b"]
 
 
 def test_public_neko_query_smoke(monkeypatch) -> None:

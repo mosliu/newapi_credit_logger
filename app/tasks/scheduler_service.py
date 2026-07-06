@@ -1,6 +1,7 @@
 from apscheduler.executors.pool import ThreadPoolExecutor
 from apscheduler.schedulers.background import BackgroundScheduler
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 import threading
 import time
 
@@ -72,7 +73,9 @@ class SourceSchedulerService:
         if not self._started:
             return 0
 
-        for job in list(self.scheduler.get_jobs()):
+        jobs = list(self.scheduler.get_jobs())
+        existing_job_ids = {job.id for job in jobs if job.id.startswith(self._job_prefix)}
+        for job in jobs:
             if job.id.startswith(self._job_prefix):
                 self.scheduler.remove_job(job.id)
 
@@ -85,16 +88,19 @@ class SourceSchedulerService:
             )
 
         for source in sources:
+            job_id = f"{self._job_prefix}{source.id}"
+            is_new_job = job_id not in existing_job_ids
             self.scheduler.add_job(
                 func=self.run_source_job,
                 trigger="interval",
                 seconds=source.interval_seconds,
-                id=f"{self._job_prefix}{source.id}",
+                id=job_id,
                 args=[source.id],
                 replace_existing=True,
                 max_instances=1,
                 coalesce=True,
                 misfire_grace_time=self._misfire_grace_seconds,
+                next_run_time=datetime.now(timezone.utc) if is_new_job else None,
             )
 
         logger.info("scheduler jobs reloaded count={}", len(sources))

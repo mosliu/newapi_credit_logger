@@ -788,6 +788,49 @@ def _extract_logs(payload: Any) -> list[dict[str, Any]]:
     return list(reversed([item for item in data if isinstance(item, dict)]))
 
 
+def _extract_models(payload: Any) -> list[dict[str, Any]]:
+    items: list[Any] = []
+    if isinstance(payload, list):
+        items = payload
+    elif isinstance(payload, dict):
+        data = payload.get("data")
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            if isinstance(data.get("data"), list):
+                items = data["data"]
+            elif isinstance(data.get("models"), list):
+                items = data["models"]
+        elif isinstance(payload.get("models"), list):
+            items = payload["models"]
+        elif payload.get("error") or payload.get("message") or payload.get("msg"):
+            raise RuntimeError(_pick_message(payload, "查询模型列表失败"))
+    else:
+        raise RuntimeError("models 返回不是 JSON 对象")
+
+    models: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        supported_endpoints = item.get("supported_endpoint_types", item.get("endpoints"))
+        if isinstance(supported_endpoints, list):
+            normalized_endpoints = [str(value).strip() for value in supported_endpoints if str(value).strip()]
+        else:
+            normalized_endpoints = []
+
+        models.append(
+            {
+                "id": str(item.get("id") or item.get("name") or item.get("model") or "").strip(),
+                "ownedBy": str(item.get("owned_by") or item.get("ownedBy") or item.get("owner") or "").strip(),
+                "object": str(item.get("object") or "").strip(),
+                "created": _to_int(item.get("created")),
+                "supportedEndpointTypes": normalized_endpoints,
+            }
+        )
+
+    return models
+
+
 def _format_expire(expires_at: int) -> str:
     if expires_at <= 0:
         return "永不过期"
@@ -981,7 +1024,15 @@ async def query_neko_token(
         "fetchDetail": need_detail,
         "tokenValid": False,
         "tokenInfo": None,
+        "models": [],
         "logs": [],
+        "rawResponse": {
+            "userSelf": None,
+            "subscription": None,
+            "usage": None,
+            "models": None,
+            "logs": None,
+        },
         "stats": {
             "logCount": 0,
             "totalQuota": 0.0,
@@ -1040,6 +1091,7 @@ async def query_neko_token(
                     log_tag="NEKO_SUB",
                     skip_http_statuses={404, 405},
                 )
+                result["rawResponse"]["subscription"] = subscription_json
             except Exception as exc:  # noqa: BLE001
                 result["errors"].append(f"令牌信息查询失败(subscription): {exc}")
 
@@ -1054,6 +1106,7 @@ async def query_neko_token(
                     log_tag="NEKO_USAGE",
                     skip_http_statuses={400, 404, 405},
                 )
+                result["rawResponse"]["usage"] = usage_json
             except Exception as exc:  # noqa: BLE001
                 result["errors"].append(f"令牌信息查询失败(usage): {exc}")
 
@@ -1077,10 +1130,31 @@ async def query_neko_token(
                     log_preview_len=log_preview_len,
                     log_tag="NEKO_SELF",
                 )
+                result["rawResponse"]["userSelf"] = user_self_payload
                 result["tokenInfo"] = _extract_user_self_usage_info(user_self_payload)
                 result["tokenValid"] = True
             except Exception as exc:  # noqa: BLE001
                 result["errors"].append(f"令牌信息查询失败: {exc}")
+
+    try:
+        models_payload = await _get_json_first_supported(
+            client=client,
+            urls=_dedupe_preserve_order(
+                [
+                    build_endpoint(api_base_url, "/v1/models"),
+                    build_endpoint(api_base_url, "/models"),
+                ]
+            ),
+            headers=headers,
+            timeout_sec=timeout,
+            log_preview_len=log_preview_len,
+            log_tag="NEKO_MODELS",
+            skip_http_statuses={404, 405},
+        )
+        result["rawResponse"]["models"] = models_payload
+        result["models"] = _extract_models(models_payload)
+    except Exception as exc:  # noqa: BLE001
+        result["errors"].append(f"模型列表查询失败: {exc}")
 
     if need_detail:
         try:
@@ -1109,6 +1183,7 @@ async def query_neko_token(
                     log_tag="NEKO_LOG",
                 )
 
+            result["rawResponse"]["logs"] = logs_payload
             logs = _extract_logs(logs_payload)
             result["logs"] = logs
             result["stats"] = _build_stats(logs)

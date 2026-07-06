@@ -190,6 +190,7 @@
             <div class="muted">管理配置、启停调度、手动采集与记录追踪。</div>
         </div>
         <div class="actions">
+            <a class="btn btn-muted" href="/admin/sources/sync">同步 Token</a>
             <a class="btn btn-muted" href="/admin/sources/analyze">分析监控源</a>
             <a class="btn" href="/admin/sources/new">新增监控源</a>
         </div>
@@ -278,7 +279,7 @@
                                 <button class="btn btn-ok" type="submit">立即采集</button>
                             </form>
                             <form class="inline" method="post" action="/admin/sources/{{ item.id }}/toggle">
-                                <button class="btn" type="submit">{{ "停用" if item.enabled else "启用" }}</button>
+                                <button class="btn{% if item.enabled %} btn-warn{% endif %}" type="submit">{{ "停用" if item.enabled else "启用" }}</button>
                             </form>
                             <form class="inline" method="post" action="/admin/sources/{{ item.id }}/delete" onsubmit="return confirm('确认删除该监控源？');">
                                 <button class="btn btn-danger" type="submit">删除</button>

@@ -135,6 +135,41 @@
     .result-meta.err {
         color: #c43850;
     }
+    .models-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+    .model-card {
+        border: 0.5px solid var(--line);
+        border-radius: 12px;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.46);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        display: grid;
+        gap: 6px;
+    }
+    .model-card.empty-card {
+        color: var(--muted);
+    }
+    .model-card-title {
+        font-weight: 700;
+        word-break: break-all;
+    }
+    .model-card-meta {
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.6;
+        word-break: break-word;
+    }
+    .raw-grid {
+        display: grid;
+        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .raw-span-full {
+        grid-column: 1 / -1;
+    }
     pre {
         margin: 0;
         border: 0.5px solid var(--line);
@@ -384,6 +419,16 @@
 
         <section class="panel reveal">
             <div class="row-between">
+                <h2 style="font-size:18px;margin:0;">模型列表</h2>
+                <span id="nekoModelsSummary" class="muted">尚未查询。</span>
+            </div>
+            <div id="nekoModelsList" class="models-grid" style="margin-top:10px;">
+                <div class="model-card empty-card">等待查询...</div>
+            </div>
+        </section>
+
+        <section class="panel reveal">
+            <div class="row-between">
                 <h2 style="font-size:18px;margin:0;">调用日志</h2>
                 <button id="nekoExportBtn" type="button" class="btn-secondary">导出 CSV</button>
             </div>
@@ -405,6 +450,32 @@
                     <tr><td colspan="7" class="empty-row">等待查询...</td></tr>
                     </tbody>
                 </table>
+            </div>
+        </section>
+
+        <section class="panel reveal">
+            <h2 style="font-size:18px;">原始返回</h2>
+            <div class="raw-grid" style="margin-top:10px;">
+                <div class="field">
+                    <label for="nekoRawUserSelf">user self (/api/user/self)</label>
+                    <pre id="nekoRawUserSelf">-</pre>
+                </div>
+                <div class="field">
+                    <label for="nekoRawSubscription">subscription (/v1/dashboard/billing/subscription)</label>
+                    <pre id="nekoRawSubscription">-</pre>
+                </div>
+                <div class="field">
+                    <label for="nekoRawUsage">usage (/v1/dashboard/billing/usage)</label>
+                    <pre id="nekoRawUsage">-</pre>
+                </div>
+                <div class="field">
+                    <label for="nekoRawModels">models (/v1/models)</label>
+                    <pre id="nekoRawModels">-</pre>
+                </div>
+                <div class="field raw-span-full">
+                    <label for="nekoRawLogs">logs (/api/log/token)</label>
+                    <pre id="nekoRawLogs">-</pre>
+                </div>
             </div>
         </section>
 
@@ -433,7 +504,7 @@ const defaults = {
   claude:           { baseUrl: "https://api.anthropic.com",                 model: "claude-sonnet-4-6" }
 };
 
-const ANYROUTER_BASE_URL = "https://a-ocnfniawgw.cn-shanghai.fcapp.run";
+const ANYROUTER_BASE_URL = "https://anyrouter.top";
 
 let defaultChannel = "openai_responses";
 let defaultCliProfile = "default";
@@ -451,7 +522,8 @@ const runtime = {
 
 const state = {
   nekoLastResult: null,
-  nekoLogs: []
+  nekoLogs: [],
+  nekoModels: []
 };
 
 let nekoDetailWanted = true;
@@ -484,8 +556,15 @@ const el = {
   nekoResultMeta:   document.getElementById("nekoResultMeta"),
   nekoResultBody:   document.getElementById("nekoResultBody"),
   nekoLogsBody:     document.getElementById("nekoLogsBody"),
+  nekoModelsSummary: document.getElementById("nekoModelsSummary"),
+  nekoModelsList:   document.getElementById("nekoModelsList"),
   nekoCopyInfoBtn:  document.getElementById("nekoCopyInfoBtn"),
   nekoExportBtn:    document.getElementById("nekoExportBtn"),
+  nekoRawUserSelf:  document.getElementById("nekoRawUserSelf"),
+  nekoRawSubscription: document.getElementById("nekoRawSubscription"),
+  nekoRawUsage:     document.getElementById("nekoRawUsage"),
+  nekoRawModels:    document.getElementById("nekoRawModels"),
+  nekoRawLogs:      document.getElementById("nekoRawLogs"),
 
   nekoTokenName:    document.getElementById("nekoTokenName"),
   nekoTotalGranted: document.getElementById("nekoTotalGranted"),
@@ -540,6 +619,16 @@ function renderNekoMeta(meta, ok) {
 
 function renderNekoBody(obj) {
   el.nekoResultBody.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
+}
+
+function formatPrettyJson(obj) {
+  if (obj == null) return "-";
+  if (typeof obj === "string") return obj;
+  try {
+    return JSON.stringify(obj, null, 2);
+  } catch {
+    return String(obj);
+  }
 }
 
 function withLoading(btn, label, asyncFn) {
@@ -879,6 +968,23 @@ function resetNekoInfoPanel() {
   el.nekoLogCount.textContent = "0";
 }
 
+function resetNekoModelsPanel(message = "等待查询...") {
+  el.nekoModelsSummary.textContent = message === "等待查询..." ? "尚未查询。" : message;
+  el.nekoModelsList.innerHTML = "";
+  const card = document.createElement("div");
+  card.className = "model-card empty-card";
+  card.textContent = message;
+  el.nekoModelsList.appendChild(card);
+}
+
+function resetNekoRawResponsePanel() {
+  el.nekoRawUserSelf.textContent = "-";
+  el.nekoRawSubscription.textContent = "-";
+  el.nekoRawUsage.textContent = "-";
+  el.nekoRawModels.textContent = "-";
+  el.nekoRawLogs.textContent = "-";
+}
+
 function renderNekoLogs(logs) {
   el.nekoLogsBody.innerHTML = "";
   if (!Array.isArray(logs) || logs.length === 0) {
@@ -912,6 +1018,52 @@ function renderNekoLogs(logs) {
   });
 }
 
+function renderNekoModels(models) {
+  const list = Array.isArray(models) ? models.filter((item) => item && typeof item === "object") : [];
+  if (list.length === 0) {
+    resetNekoModelsPanel("未发现可用模型。");
+    return;
+  }
+
+  el.nekoModelsSummary.textContent = `共发现 ${list.length} 个模型。`;
+  el.nekoModelsList.innerHTML = "";
+
+  list.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "model-card";
+
+    const title = document.createElement("div");
+    title.className = "model-card-title";
+    title.textContent = item.id || "未命名模型";
+
+    const meta = document.createElement("div");
+    meta.className = "model-card-meta";
+    const endpoints = Array.isArray(item.supportedEndpointTypes) && item.supportedEndpointTypes.length > 0
+      ? item.supportedEndpointTypes.join(" / ")
+      : "未提供";
+    const lines = [
+      `owned_by: ${item.ownedBy || "-"}`,
+      `object: ${item.object || "-"}`,
+      `endpoints: ${endpoints}`,
+      `created: ${item.created ? formatTime(item.created) : "-"}`
+    ];
+    meta.textContent = lines.join("\n");
+
+    card.appendChild(title);
+    card.appendChild(meta);
+    el.nekoModelsList.appendChild(card);
+  });
+}
+
+function renderNekoRawResponse(rawResponse) {
+  const raw = rawResponse && typeof rawResponse === "object" ? rawResponse : {};
+  el.nekoRawUserSelf.textContent = formatPrettyJson(raw.userSelf);
+  el.nekoRawSubscription.textContent = formatPrettyJson(raw.subscription);
+  el.nekoRawUsage.textContent = formatPrettyJson(raw.usage);
+  el.nekoRawModels.textContent = formatPrettyJson(raw.models);
+  el.nekoRawLogs.textContent = formatPrettyJson(raw.logs);
+}
+
 function renderNekoTokenInfo(result) {
   const tokenInfo = (result && typeof result === "object") ? result.tokenInfo : null;
   const stats = (result && typeof result === "object") ? (result.stats || {}) : {};
@@ -934,6 +1086,7 @@ function renderNekoTokenInfo(result) {
 function buildTokenInfoText(result) {
   const tokenInfo = result && result.tokenInfo;
   const stats = result && result.stats ? result.stats : {};
+  const models = result && Array.isArray(result.models) ? result.models : [];
   if (!tokenInfo) return "暂无令牌信息";
 
   const unlimited = !!tokenInfo.unlimitedQuota;
@@ -944,6 +1097,7 @@ function buildTokenInfoText(result) {
     `剩余额度: ${unlimited ? "无限制" : formatQuota(tokenInfo.totalAvailable)}`,
     `已用额度: ${unlimited ? "不计算" : formatQuota(tokenInfo.totalUsed)}`,
     `有效期至: ${tokenInfo.expiresAtText || formatTime(tokenInfo.expiresAt)}`,
+    `模型数量: ${models.length}`,
     `日志条数: ${stats.logCount || 0}`,
     `累计花费: ${formatQuota(stats.totalQuota || 0)}`
   ].join("\n");
@@ -987,9 +1141,12 @@ el.nekoQueryBtn.addEventListener(
 
       state.nekoLastResult = result;
       state.nekoLogs = Array.isArray(result.logs) ? result.logs : [];
+      state.nekoModels = Array.isArray(result.models) ? result.models : [];
 
       renderNekoTokenInfo(result);
+      renderNekoModels(state.nekoModels);
       renderNekoLogs(state.nekoLogs);
+      renderNekoRawResponse(result.rawResponse);
       renderNekoBody(result);
 
       const errors = Array.isArray(result.errors) ? result.errors : [];
@@ -997,6 +1154,7 @@ el.nekoQueryBtn.addEventListener(
         `variant=${result.variant || variant}`,
         `baseUrl=${result.baseUrl || baseUrl}`,
         `token=${result.tokenMasked || maskKey(token)}`,
+        `models=${state.nekoModels.length}`,
         `logs=${(result.stats && result.stats.logCount) || state.nekoLogs.length}`
       ];
       if (errors.length > 0) statusLine.push(`部分失败=${errors.length}`);
@@ -1005,8 +1163,11 @@ el.nekoQueryBtn.addEventListener(
     } catch (err) {
       state.nekoLastResult = null;
       state.nekoLogs = [];
+      state.nekoModels = [];
       resetNekoInfoPanel();
+      resetNekoModelsPanel();
       renderNekoLogs([]);
+      resetNekoRawResponsePanel();
       renderNekoMeta(`查询失败：${err.message}`, false);
       renderNekoBody({ error: err.message, baseUrl, tokenMasked: maskKey(token) });
       el.nekoInfo.textContent = "查询失败，请检查 base_url、token 与网络连通性。";
@@ -1017,11 +1178,14 @@ el.nekoQueryBtn.addEventListener(
 el.nekoResetBtn.addEventListener("click", () => {
   state.nekoLastResult = null;
   state.nekoLogs = [];
+  state.nekoModels = [];
   el.nekoResultBody.textContent = "等待请求...";
   el.nekoResultMeta.textContent = "尚未查询。";
   el.nekoInfo.textContent = "已清空结果。";
   resetNekoInfoPanel();
+  resetNekoModelsPanel();
   renderNekoLogs([]);
+  resetNekoRawResponsePanel();
 });
 
 el.nekoCopyInfoBtn.addEventListener("click", async () => {
@@ -1068,7 +1232,9 @@ async function initApp() {
   applyDefaults(true);
 
   resetNekoInfoPanel();
+  resetNekoModelsPanel();
   renderNekoLogs([]);
+  resetNekoRawResponsePanel();
 }
 
 initApp();

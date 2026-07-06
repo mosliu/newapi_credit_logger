@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.schemas.source import SourceCreate, SourceResponse, SourceUpdate
+from app.api.schemas.source_sync import SourceSyncRequest, SourceSyncResponse
 from app.db.session import get_db
 from app.services.source_service import (
     create_source,
@@ -11,6 +12,7 @@ from app.services.source_service import (
     list_sources,
     update_source,
 )
+from app.services.source_sync_service import sync_sources_from_newapi_user_account
 from app.tasks.scheduler_service import source_scheduler_service
 
 router = APIRouter(prefix="/sources")
@@ -61,3 +63,26 @@ async def delete_source_item(source_id: int, db: Session = Depends(get_db)) -> N
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
     source_scheduler_service.reload_jobs()
+
+
+@router.post("/sync/newapi-user", response_model=SourceSyncResponse)
+async def sync_sources_from_newapi_user(
+    payload: SourceSyncRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+) -> SourceSyncResponse:
+    client = getattr(request.app.state, "http_client", None)
+    try:
+        result = await sync_sources_from_newapi_user_account(
+            db=db,
+            payload=payload,
+            client=client,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+
+    if result["created_count"] > 0:
+        source_scheduler_service.reload_jobs()
+    return SourceSyncResponse.model_validate(result)

@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}同步 NewAPI Token{% endblock %}
+{% block content %}
+<section class="card reveal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div>
+            <h2 class="card-title">同步 NewAPI Token</h2>
+            <div class="muted">输入 `base_url`、`user_id`、`user_token`，一键拉取并导入该账户下全部 token；按名称去重。</div>
+        </div>
+        <div class="actions">
+            <a class="btn btn-muted" href="/admin/sources">返回监控源列表</a>
+        </div>
+    </div>
+</section>
+
+<section class="card reveal">
+    {% if error %}
+        <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/admin/sources/sync">
+        <div class="grid">
+            <label>NewAPI 地址（Base URL）
+                <input type="text" name="base_url" required value="{{ form_data.base_url }}" placeholder="https://newapi.example.com">
+            </label>
+            <label>用户 ID
+                <input type="text" name="user_id" required value="{{ form_data.user_id }}" placeholder="例如：1">
+            </label>
+            <label>用户 Token
+                <input type="password" name="user_token" required value="{{ form_data.user_token }}" placeholder="请输入可查询 Token 列表的凭证">
+            </label>
+            <label>Provider
+                <select name="provider_type">
+                    {% for option in provider_options %}
+                        <option value="{{ option.value }}" {% if form_data.provider_type == option.value %}selected{% endif %}>{{ option.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label>导入后 Owner（可选）
+                <input type="text" name="key_owner" value="{{ form_data.key_owner }}" placeholder="留空时自动使用 user-{{ form_data.user_id or 'id' }}">
+            </label>
+            <label>采集周期（秒）
+                <input type="number" min="10" max="86400" name="interval_seconds" required value="{{ form_data.interval_seconds }}">
+            </label>
+            <label>超时（秒）
+                <input type="number" min="1" max="120" name="timeout_seconds" required value="{{ form_data.timeout_seconds }}">
+            </label>
+            <label class="checkbox-row">
+                <input type="checkbox" name="enabled" {% if form_data.enabled %}checked{% endif %}>
+                导入后启用监控
+            </label>
+        </div>
+        <div class="actions" style="margin-top:14px;">
+            <button class="btn btn-ok" type="submit">一键同步</button>
+            <a class="btn btn-muted" href="/admin/sources/sync">清空</a>
+        </div>
+    </form>
+</section>
+
+{% if result %}
+<section class="card reveal">
+    <h2 class="card-title">本次同步结果</h2>
+    <div class="muted" style="margin-top:6px;">{{ result.message }}</div>
+    <div class="table-wrap" style="margin-top:10px;">
+        <table>
+            <tbody>
+                <tr>
+                    <th style="width:180px;">状态</th>
+                    <td>{{ result.status }}</td>
+                </tr>
+                <tr>
+                    <th>来源地址</th>
+                    <td>{{ result.base_url }}</td>
+                </tr>
+                <tr>
+                    <th>用户 ID</th>
+                    <td>{{ result.user_id }}</td>
+                </tr>
+                <tr>
+                    <th>命中接口</th>
+                    <td>{{ result.used_endpoint }}</td>
+                </tr>
+                <tr>
+                    <th>数量统计</th>
+                    <td>拉取 {{ result.fetched_count }} / 新增 {{ result.created_count }} / 跳过 {{ result.skipped_count }} / 失败 {{ result.failed_count }}</td>
+                </tr>
+                <tr>
+                    <th>新增名称</th>
+                    <td>
+                        {% if result.created_source_names %}
+                            {{ result.created_source_names | join("，") }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <th>错误详情</th>
+                    <td>
+                        {% if result.errors %}
+                            {{ result.errors | join("；") }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endif %}
+
+<section class="card reveal">
+    <h2 class="card-title">最近同步记录</h2>
+    <div class="table-wrap" style="margin-top:10px;">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>状态</th>
+                    <th>地址</th>
+                    <th>用户 ID</th>
+                    <th>拉取</th>
+                    <th>新增</th>
+                    <th>跳过</th>
+                    <th>失败</th>
+                    <th>消息</th>
+                    <th>完成时间</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in runs %}
+                <tr>
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.status }}</td>
+                    <td>{{ row.base_url }}</td>
+                    <td>{{ row.user_id }}</td>
+                    <td>{{ row.fetched_count }}</td>
+                    <td>{{ row.created_count }}</td>
+                    <td>{{ row.skipped_count }}</td>
+                    <td>{{ row.failed_count }}</td>
+                    <td>{{ row.message or "-" }}</td>
+                    <td>{% if row.finished_at %}{{ row.finished_at }}{% else %}-{% endif %}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="10">暂无同步记录</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}
