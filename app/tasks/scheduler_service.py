@@ -74,7 +74,10 @@ class SourceSchedulerService:
             return 0
 
         jobs = list(self.scheduler.get_jobs())
-        existing_job_ids = {job.id for job in jobs if job.id.startswith(self._job_prefix)}
+        # 记录已有 job 的下次运行时间，重建后保留原计划。
+        existing_next_run_times = {
+            job.id: job.next_run_time for job in jobs if job.id.startswith(self._job_prefix)
+        }
         for job in jobs:
             if job.id.startswith(self._job_prefix):
                 self.scheduler.remove_job(job.id)
@@ -89,7 +92,9 @@ class SourceSchedulerService:
 
         for source in sources:
             job_id = f"{self._job_prefix}{source.id}"
-            is_new_job = job_id not in existing_job_ids
+            # 新 job 立即执行一次；已有 job 保留原计划时间。
+            # 注意：APScheduler 3.x 中 next_run_time=None 表示暂停任务，不能传 None。
+            next_run_time = existing_next_run_times.get(job_id) or datetime.now(timezone.utc)
             self.scheduler.add_job(
                 func=self.run_source_job,
                 trigger="interval",
@@ -100,7 +105,7 @@ class SourceSchedulerService:
                 max_instances=1,
                 coalesce=True,
                 misfire_grace_time=self._misfire_grace_seconds,
-                next_run_time=datetime.now(timezone.utc) if is_new_job else None,
+                next_run_time=next_run_time,
             )
 
         logger.info("scheduler jobs reloaded count={}", len(sources))

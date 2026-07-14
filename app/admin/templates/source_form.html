@@ -28,6 +28,7 @@
                         <option value="{{ option.value }}" {% if form_data.provider_type == option.value %}selected{% endif %}>{{ option.label }}</option>
                     {% endfor %}
                 </select>
+                <button id="anyrouterQuickBtn" type="button" class="btn btn-muted" style="margin-top:6px;">Anyrouter</button>
             </label>
             <label>地址
                 <input type="text" name="base_url" required value="{{ form_data.base_url }}">
@@ -45,7 +46,7 @@
                 <input type="text" name="customer_info" value="{{ form_data.customer_info }}">
             </label>
             <label>Key创建时间
-                <input type="datetime-local" name="key_created_at" value="{{ form_data.key_created_at }}">
+                <input type="datetime-local" name="key_created_at" value="{{ form_data.key_created_at }}" min="1970-01-01T00:00" max="9999-12-31T23:59">
             </label>
             <label>收费金额
                 <input type="number" min="0" step="0.01" name="fee_amount" value="{{ form_data.fee_amount }}">
@@ -74,4 +75,31 @@
         </div>
     </form>
 </section>
+
+<script>
+(() => {
+    const ANYROUTER_BASE_URL = "https://a-ocnfniawgw.cn-shanghai.fcapp.run";
+    const form = document.querySelector('form[action="{{ action_url }}"]');
+    if (!form) return;
+
+    // Anyrouter 快捷按钮：选择旧版 Provider 并填充地址
+    const anyrouterBtn = document.getElementById("anyrouterQuickBtn");
+    if (anyrouterBtn) {
+        anyrouterBtn.addEventListener("click", () => {
+            const providerSelect = form.querySelector('select[name="provider_type"]');
+            const baseUrlInput = form.querySelector('input[name="base_url"]');
+            if (providerSelect) providerSelect.value = "newapi_legacy";
+            if (baseUrlInput) baseUrlInput.value = ANYROUTER_BASE_URL;
+        });
+    }
+
+    // 新增时 Key 创建时间默认初始化为当前时间减 3 分钟
+    const keyCreatedInput = form.querySelector('input[name="key_created_at"]');
+    if (keyCreatedInput && !keyCreatedInput.value) {
+        const now = new Date(Date.now() - 3 * 60 * 1000);
+        const pad = (n) => String(n).padStart(2, "0");
+        keyCreatedInput.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    }
+})();
+</script>
 {% endblock %}

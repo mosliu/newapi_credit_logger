@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     log_retention: str = "30 days"
     log_preview_len: int = 220
 
-    default_poll_interval_seconds: int = 300
+    default_poll_interval_seconds: int = 1200
     default_request_timeout_seconds: int = 20
     default_request_retries: int = 2
     scheduler_request_delay_seconds: float = 1.0

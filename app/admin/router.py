@@ -227,14 +227,27 @@ async def admin_sources_analyze(
     window_end = datetime.utcnow()
     window_start = window_end - timedelta(minutes=minutes)
     rows = list_source_balance_changes(db, window_start=window_start, window_end=window_end)
+
+    # 展示层统一转换为东八区（UTC+8）
+    tz_offset = timedelta(hours=8)
+
+    def _fmt_cst(value: datetime | None) -> str | None:
+        if value is None:
+            return None
+        return (value + tz_offset).strftime("%Y-%m-%d %H:%M:%S")
+
+    for item in rows:
+        item["first_checked_at"] = _fmt_cst(item["first_checked_at"])
+        item["last_checked_at"] = _fmt_cst(item["last_checked_at"])
+
     return templates.TemplateResponse(
         request=request,
         name="source_analyze.html",
         context={
             "rows": rows,
             "minutes": minutes,
-            "range_start": window_start.strftime("%Y-%m-%d %H:%M:%S"),
-            "range_end": window_end.strftime("%Y-%m-%d %H:%M:%S"),
+            "range_start": _fmt_cst(window_start),
+            "range_end": _fmt_cst(window_end),
             "is_admin_authenticated": is_admin_authenticated(request),
         },
     )

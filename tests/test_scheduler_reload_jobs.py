@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 from app.tasks import scheduler_service
@@ -93,7 +94,11 @@ def test_scheduler_reload_jobs_keeps_existing_job_schedule(monkeypatch) -> None:
     def _fake_session_local():
         yield _FakeDb()
 
-    existing_job = SimpleNamespace(id=f"{service._job_prefix}{source.id}")
+    existing_next_run_time = datetime(2026, 7, 13, 12, 0, 0, tzinfo=timezone.utc)
+    existing_job = SimpleNamespace(
+        id=f"{service._job_prefix}{source.id}",
+        next_run_time=existing_next_run_time,
+    )
 
     monkeypatch.setattr(scheduler_service, "SessionLocal", _fake_session_local)
     monkeypatch.setattr(service.scheduler, "get_jobs", lambda: [existing_job])
@@ -110,4 +115,5 @@ def test_scheduler_reload_jobs_keeps_existing_job_schedule(monkeypatch) -> None:
 
     assert count == 1
     assert added_job_kwargs["id"] == f"{service._job_prefix}{source.id}"
-    assert added_job_kwargs["next_run_time"] is None
+    # 不能为 None：APScheduler 3.x 中 None 表示暂停任务；应保留原计划时间。
+    assert added_job_kwargs["next_run_time"] == existing_next_run_time
