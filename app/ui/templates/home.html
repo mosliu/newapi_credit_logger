@@ -668,7 +668,8 @@ function formatTime(ts) {
   const ms = n > 1e12 ? n : n * 1000;
   const d = new Date(ms);
   if (Number.isNaN(d.getTime())) return "-";
-  return d.toLocaleString();
+  // 展示统一使用东八区（UTC+8）
+  return d.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false });
 }
 
 function formatQuota(value) {

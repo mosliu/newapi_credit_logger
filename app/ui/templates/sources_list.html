@@ -51,7 +51,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        {% if item.latest_checked_at %}{{ item.latest_checked_at }}{% else %}-{% endif %}
+                        {% if item.latest_checked_at %}{{ item.latest_checked_at | cst }}{% else %}-{% endif %}
                         {% if item.latest_success is sameas true %}
                             <div class="ok">成功</div>
                         {% elif item.latest_success is sameas false %}

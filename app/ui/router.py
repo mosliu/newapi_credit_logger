@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.timezone import cst_to_utc_naive, fmt_cst
 from app.db.session import get_db
 from app.services.admin_auth_service import is_admin_authenticated
 from app.services.query_service import (
@@ -19,6 +20,7 @@ from app.services.query_service import (
 router = APIRouter(prefix="/ui")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["app_version"] = get_settings().app_version
+templates.env.filters["cst"] = fmt_cst
 
 
 @router.get("", response_class=HTMLResponse)
@@ -83,7 +85,13 @@ async def source_detail(
     if not is_admin_authenticated(request):
         return RedirectResponse(url="/admin/login", status_code=status.HTTP_303_SEE_OTHER)
 
-    source, records = get_source_detail(db, source_id, start_at=start_at, end_at=end_at)
+    # 用户输入的筛选时间按东八区解释，查询前转换为 UTC
+    source, records = get_source_detail(
+        db,
+        source_id,
+        start_at=cst_to_utc_naive(start_at),
+        end_at=cst_to_utc_naive(end_at),
+    )
     if source is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
 

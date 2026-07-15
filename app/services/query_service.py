@@ -4,6 +4,7 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
+from app.core.timezone import fmt_cst
 from app.models.api_key_source import ApiKeySource
 from app.models.balance_record import BalanceRecord
 from app.services.crypto_service import decrypt_api_key, mask_api_key
@@ -186,7 +187,8 @@ def build_chart_points(records: list[BalanceRecord]) -> list[dict]:
         value = float(item.balance) if isinstance(item.balance, Decimal) else item.balance
         points.append(
             {
-                "time": item.checked_at.isoformat(),
+                # 展示用图表时间统一转换为东八区
+                "time": fmt_cst(item.checked_at, fmt="%Y-%m-%dT%H:%M:%S"),
                 "limit_amount": float(item.limit_amount) if item.limit_amount is not None else None,
                 "usage_amount": float(item.usage_amount) if item.usage_amount is not None else None,
                 "balance": value,

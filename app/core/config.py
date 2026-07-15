@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "NewAPI Credit Logger"
-    app_version: str = "0.1.3"
+    app_version: str = "0.1.4"
     app_env: str = "dev"
     app_host: str = "0.0.0.0"
     app_port: int = 8000

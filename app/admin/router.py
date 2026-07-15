@@ -1,4 +1,4 @@
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.api.schemas.source import SourceCreate, SourceUpdate
 from app.api.schemas.source_sync import SourceSyncRequest
 from app.core.config import get_settings
+from app.core.timezone import cst_to_utc_naive, fmt_cst, to_cst
 from app.db.session import get_db
 from app.services.admin_auth_service import (
     clear_admin_authenticated,
@@ -35,6 +36,7 @@ from app.tasks.scheduler_service import source_scheduler_service
 router = APIRouter(prefix="/admin")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 templates.env.globals["app_version"] = get_settings().app_version
+templates.env.filters["cst"] = fmt_cst
 
 _ADMIN_TOAST_SESSION_KEY = "admin_toast"
 
@@ -229,16 +231,9 @@ async def admin_sources_analyze(
     rows = list_source_balance_changes(db, window_start=window_start, window_end=window_end)
 
     # 展示层统一转换为东八区（UTC+8）
-    tz_offset = timedelta(hours=8)
-
-    def _fmt_cst(value: datetime | None) -> str | None:
-        if value is None:
-            return None
-        return (value + tz_offset).strftime("%Y-%m-%d %H:%M:%S")
-
     for item in rows:
-        item["first_checked_at"] = _fmt_cst(item["first_checked_at"])
-        item["last_checked_at"] = _fmt_cst(item["last_checked_at"])
+        item["first_checked_at"] = fmt_cst(item["first_checked_at"], default="")
+        item["last_checked_at"] = fmt_cst(item["last_checked_at"], default="")
 
     return templates.TemplateResponse(
         request=request,
@@ -246,8 +241,8 @@ async def admin_sources_analyze(
         context={
             "rows": rows,
             "minutes": minutes,
-            "range_start": _fmt_cst(window_start),
-            "range_end": _fmt_cst(window_end),
+            "range_start": fmt_cst(window_start),
+            "range_end": fmt_cst(window_end),
             "is_admin_authenticated": is_admin_authenticated(request),
         },
     )
@@ -581,23 +576,33 @@ async def admin_source_records(
     filter_message: str | None = None
     if start_at is None and end_at is None:
         if start_day is None and end_day is None:
-            selected_start = day or datetime.now().date()
+            today_cst = to_cst(datetime.now(timezone.utc)).date()
+            selected_start = day or today_cst
             selected_end = selected_start
         else:
-            selected_start = start_day or end_day or datetime.now().date()
+            today_cst = to_cst(datetime.now(timezone.utc)).date()
+            selected_start = start_day or end_day or today_cst
             selected_end = end_day or start_day or selected_start
 
         if selected_end < selected_start:
             filter_message = "结束日期早于起始日期，已自动交换。"
             selected_start, selected_end = selected_end, selected_start
 
-        start_at = datetime.combine(selected_start, time.min)
-        end_at = datetime.combine(selected_end, time.min) + timedelta(days=1)
+        # 用户输入的日期按东八区解释，转换为 UTC 后查询
+        display_start = datetime.combine(selected_start, time.min)
+        display_end = datetime.combine(selected_end, time.min) + timedelta(days=1)
+        start_at = cst_to_utc_naive(display_start)
+        end_at = cst_to_utc_naive(display_end)
         start_day = selected_start
         end_day = selected_end
     else:
-        start_day = start_at.date() if start_at else (end_at.date() if end_at else start_day)
-        end_day = end_at.date() if end_at else start_day
+        # 显式时间参数同样按东八区解释
+        display_start = start_at
+        display_end = end_at
+        start_at = cst_to_utc_naive(start_at)
+        end_at = cst_to_utc_naive(end_at)
+        start_day = display_start.date() if display_start else (display_end.date() if display_end else start_day)
+        end_day = display_end.date() if display_end else start_day
 
     source, records = get_source_detail(db, source_id, start_at=start_at, end_at=end_at)
     if source is None:
@@ -615,8 +620,8 @@ async def admin_source_records(
             "chart_points": chart_points,
             "filter_start_date": start_day.isoformat() if start_day else "",
             "filter_end_date": end_day.isoformat() if end_day else "",
-            "range_start": start_at.strftime("%Y-%m-%d %H:%M:%S") if start_at else "",
-            "range_end": end_at.strftime("%Y-%m-%d %H:%M:%S") if end_at else "",
+            "range_start": display_start.strftime("%Y-%m-%d %H:%M:%S") if display_start else "",
+            "range_end": display_end.strftime("%Y-%m-%d %H:%M:%S") if display_end else "",
             "filter_message": filter_message or "",
             "is_admin_authenticated": is_admin_authenticated(request),
         },
